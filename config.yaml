@@ -111,6 +111,26 @@ backtest:
   save_equity_curve: true
   output_dir: "reports"
 
+# ── Self-Learning Engine ─────────────────────────────────────
+learning:
+  enabled: false                    # Set true to activate the learning layer
+  db_path: "data/learning.db"      # SQLite database for trade history
+  analysis_every_n_trades: 50      # Run full pattern analysis every N trades
+  min_trades_before_update: 30     # Don't apply learned filters until N trades
+  adaptive_threshold: true         # Use learned confidence as an entry filter
+  min_confidence_threshold: 0.45   # Below this → setup rejected (when enabled)
+  min_pattern_samples: 20          # Min trades before a pattern is "significant"
+  decay_halflife: 500              # Exponential decay half-life (in trades)
+  # Validation settings
+  validation:
+    min_is_trades: 30              # Minimum in-sample trades for validation
+    min_oos_trades: 10             # Minimum out-of-sample trades
+    oos_pct: 0.20                  # Hold-out fraction (20%)
+    wf_window_trades: 60           # Walk-forward IS window
+    wf_step_trades: 20             # Walk-forward step size
+    max_overfit_score: 0.50        # Reject if OOS degrades more than 50%
+    min_oos_ratio: 0.40            # OOS expectancy must be ≥40% of IS
+
 # ── Logging ──────────────────────────────────────────────────
 logging:
   level: "INFO"                    # DEBUG | INFO | WARNING | ERROR

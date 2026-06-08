@@ -35,6 +35,15 @@ from .execution_engine import ExecutionEngine
 from .psychology_layer import PsychologyLayer
 from .performance_analyzer import PerformanceAnalyzer
 
+try:
+    from .learning import LearningEngine
+    from .learning.feature_extractor import FeatureVector
+    _LEARNING_AVAILABLE = True
+except ImportError:
+    LearningEngine = None       # type: ignore[assignment,misc]
+    FeatureVector  = None       # type: ignore[assignment]
+    _LEARNING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +61,7 @@ class Backtester:
     Orchestrates a full backtest run. Entry point: `run()`.
     """
 
-    def __init__(self, cfg: dict) -> None:
+    def __init__(self, cfg: dict, learning_engine=None) -> None:
         self._cfg = cfg
         self._bot_cfg  = cfg.get("bot", {})
         self._bt_cfg   = cfg.get("backtest", {})
@@ -64,6 +73,17 @@ class Backtester:
         self._log_trades   = self._bt_cfg.get("log_trades", True)
         self._partial_pct  = self._strat_cfg.get("partial_tp_pct", 0.5)
         self._htf_tf       = self._bot_cfg.get("htf_timeframe", "4H")
+
+        # Optional learning engine (passed in or auto-created from config)
+        self._learning: Optional[object] = learning_engine
+        if self._learning is None and _LEARNING_AVAILABLE:
+            lc = cfg.get("learning", {})
+            if lc.get("enabled", False):
+                self._learning = LearningEngine(cfg)
+                self._learning.initialize()
+
+        # Feature cache: trade_id → FeatureVector (for post-close learning update)
+        self._feature_cache: dict = {}
 
         # Sub-systems (initialised fresh per run)
         self._data_handler: Optional[DataHandler]             = None
@@ -105,6 +125,8 @@ class Backtester:
         last_day                      = None
         last_trade_direction: Optional[TradeDirection] = None
         last_trade_was_loss: bool     = False
+        last_outcome_str: str         = "NONE"
+        current_regime_snapshot       = None
 
         n = len(df)
         for i in range(n):
@@ -127,6 +149,13 @@ class Backtester:
 
             # ── Update market structure ──────────────────────────────────────
             state = self._ms_engine.update(df, i)
+
+            # ── Regime detection (learning subsystem) ────────────────────────
+            if self._learning and self._learning.enabled:
+                try:
+                    current_regime_snapshot = self._learning.detect_regime(df, i)
+                except Exception:
+                    current_regime_snapshot = None
 
             # ── Apply HTF bias ────────────────────────────────────────────────
             if htf_bias_map is not None:
@@ -166,8 +195,21 @@ class Backtester:
 
                     last_trade_direction = trade.direction
                     last_trade_was_loss  = not won
+                    last_outcome_str     = "WIN" if won else "LOSS"
 
                     self._record_trade(closed_trades, trade, total_pnl, atr_proxy)
+
+                    # ── Learning: post-trade update ───────────────────────────
+                    if self._learning and self._learning.enabled:
+                        trade_record = closed_trades[-1]
+                        features = self._feature_cache.pop(trade.trade_id, None)
+                        if features is not None:
+                            try:
+                                self._learning.record_trade(trade_record, features)
+                                self._learning.post_trade_review(trade_record, features)
+                            except Exception as _le:
+                                logger.debug("Learning update error (non-fatal): %s", _le)
+
                     open_trades.remove(trade)
                     equity_curve.append(self._risk.equity)
 
@@ -215,11 +257,48 @@ class Backtester:
                     logger.debug("Trade blocked by risk: %s", risk_report.reason)
                     continue
 
+                # ── Learning: confidence gate + feature extraction ────────────
+                _features = None
+                if self._learning and self._learning.enabled and current_regime_snapshot:
+                    try:
+                        htf_bias_str = str(
+                            htf_bias_map.get(str(ts)[:10], Trend.UNKNOWN).value
+                            if htf_bias_map else "UNKNOWN"
+                        )
+                        _features = self._learning.extract_features(
+                            setup              = setup,
+                            state              = state,
+                            candle             = candle,
+                            df                 = df,
+                            bar_index          = i,
+                            regime_snapshot    = current_regime_snapshot,
+                            consecutive_losses = self._psychology.consecutive_losses,
+                            prev_outcome       = last_outcome_str,
+                            htf_bias           = htf_bias_str,
+                        )
+                        if _features is not None:
+                            breakdown = self._learning.get_setup_confidence(_features)
+                            if not self._learning.is_confidence_sufficient(breakdown):
+                                logger.debug(
+                                    "Trade filtered by learning confidence: %.2f",
+                                    breakdown.final_score,
+                                )
+                                continue
+                            logger.debug(
+                                "Learning confidence: %s",
+                                self._learning.summarise_confidence(breakdown),
+                            )
+                    except Exception as _le:
+                        logger.debug("Learning confidence check error (non-fatal): %s", _le)
+
                 # Execute
                 trade = self._execution.submit_order(setup, risk_report, i, bar_data)
                 if trade:
                     self._risk.register_trade_open(risk_report.lot_size)
                     open_trades.append(trade)
+                    # Cache features for post-trade learning update
+                    if _features is not None:
+                        self._feature_cache[trade.trade_id] = _features
 
         # ── Close any remaining open trades at last price ────────────────────
         for trade in open_trades:
@@ -228,6 +307,13 @@ class Backtester:
             self._risk.register_trade_close(pnl)
             self._record_trade(closed_trades, trade, pnl, 0.0)
             equity_curve.append(self._risk.equity)
+
+        # ── Learning engine shutdown ──────────────────────────────────────────
+        if self._learning and self._learning.enabled:
+            try:
+                self._learning.shutdown()
+            except Exception:
+                pass
 
         # ── Performance analysis ──────────────────────────────────────────────
         analyzer = PerformanceAnalyzer(self._cfg)
