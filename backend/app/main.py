@@ -38,7 +38,6 @@ def _configure_logging() -> None:
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.stdlib.PositionalArgumentsFormatter(),
             structlog.processors.StackInfoRenderer(),
@@ -59,11 +58,14 @@ def _configure_logging() -> None:
         force=True,
     )
 
-    # Also write to file
+    # Also write to file (best-effort — skip if path is missing or unwritable)
     if settings.api_log_file:
-        file_handler = logging.FileHandler(str(settings.api_log_file))
-        file_handler.setLevel(log_level)
-        logging.getLogger().addHandler(file_handler)
+        try:
+            file_handler = logging.FileHandler(str(settings.api_log_file))
+            file_handler.setLevel(log_level)
+            logging.getLogger().addHandler(file_handler)
+        except OSError:
+            pass
 
 
 _configure_logging()
