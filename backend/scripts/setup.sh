@@ -11,7 +11,7 @@
 #   --domain DOMAIN     Domain or IP for SSL CN         (default: $(hostname))
 #
 # What this script does:
-#   1. Installs system dependencies (Python 3.11, openssl, ufw)
+#   1. Installs system dependencies (Python 3.10+, openssl, ufw)
 #   2. Creates a Python virtual environment for the backend
 #   3. Installs Python dependencies from requirements.txt
 #   4. Generates a self-signed TLS certificate (replace with Let's Encrypt)
@@ -72,18 +72,52 @@ fi
 # ── System dependencies ───────────────────────────────────────────────────────
 echo "[1/10] Installing system packages..."
 apt-get update -qq
+
+# Install base packages (always available)
 apt-get install -y --no-install-recommends \
-    python3.11 python3.11-venv python3.11-dev python3-pip \
+    python3 python3-venv python3-dev python3-pip \
     openssl libssl-dev libffi-dev \
     git curl wget \
     ufw \
     build-essential \
     systemd 2>/dev/null || true
+
+# Try to install Python 3.11 specifically; fall back gracefully
+if apt-get install -y --no-install-recommends python3.11 python3.11-venv python3.11-dev 2>/dev/null; then
+    PYTHON_BIN="python3.11"
+    echo "  Python 3.11 installed from default repos."
+else
+    echo "  Python 3.11 not in default repos — trying deadsnakes PPA..."
+    apt-get install -y --no-install-recommends software-properties-common 2>/dev/null || true
+    if add-apt-repository -y ppa:deadsnakes/ppa 2>/dev/null && \
+       apt-get update -qq && \
+       apt-get install -y --no-install-recommends python3.11 python3.11-venv python3.11-dev 2>/dev/null; then
+        PYTHON_BIN="python3.11"
+        echo "  Python 3.11 installed from deadsnakes PPA."
+    else
+        # Fall back to whatever python3 is available (3.10, 3.12, etc.)
+        PYTHON_BIN="$(command -v python3.12 || command -v python3.11 || command -v python3.10 || command -v python3)"
+        echo "  Using available Python: ${PYTHON_BIN}"
+    fi
+fi
+
+# Verify minimum version (3.10+)
+PY_VER=$("${PYTHON_BIN}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PY_MAJOR=$("${PYTHON_BIN}" -c "import sys; print(sys.version_info.major)")
+PY_MINOR=$("${PYTHON_BIN}" -c "import sys; print(sys.version_info.minor)")
+
+if [[ "${PY_MAJOR}" -lt 3 ]] || [[ "${PY_MAJOR}" -eq 3 && "${PY_MINOR}" -lt 10 ]]; then
+    echo "ERROR: Python 3.10 or newer is required. Found Python ${PY_VER}."
+    echo "       Run: sudo apt install python3.11  (or upgrade your Ubuntu version)"
+    exit 1
+fi
+
+echo "  Using Python ${PY_VER} (${PYTHON_BIN})"
 echo "  System packages installed."
 
 # ── Python virtual environment ────────────────────────────────────────────────
 echo "[2/10] Creating Python virtual environment..."
-python3.11 -m venv "${VENV}"
+"${PYTHON_BIN}" -m venv "${VENV}"
 "${VENV}/bin/pip" install --upgrade pip wheel setuptools -q
 echo "  Venv created at ${VENV}"
 

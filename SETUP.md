@@ -812,6 +812,33 @@ sudo ufw reload
 
 ---
 
+### "python3.11: command not found" During Setup
+
+This means your Ubuntu version doesn't have Python 3.11 in its default package list. The updated setup script handles this automatically by trying Python 3.11, then falling back to whatever Python 3.10+ is available.
+
+If you already got this error, run these commands to fix it and re-run setup:
+
+```bash
+# Option A — Install Python 3.11 from the deadsnakes PPA (recommended)
+sudo apt install -y software-properties-common
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv python3.11-dev
+
+# Then re-run setup
+sudo bash backend/scripts/setup.sh
+```
+
+```bash
+# Option B — Use Python 3.10 (already on Ubuntu 22.04)
+# The updated setup.sh detects this automatically.
+# Just re-run setup with the latest script:
+git pull origin claude/xauusd-price-action-bot-T80IJ
+sudo bash backend/scripts/setup.sh
+```
+
+---
+
 ### "Bot Won't Start"
 
 **Check the bot's status:**
