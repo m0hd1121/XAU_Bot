@@ -269,29 +269,44 @@ echo "  Sudoers configured at ${SUDOERS_FILE}"
 echo "[8/10] Installing systemd services..."
 SYSTEMD_DIR="${BACKEND_DIR}/systemd"
 
+# Shared sed substitutions — replace every hardcoded path/user in the template
+# with the actual detected values regardless of folder name or username.
+patch_service() {
+    sed \
+        -e "s|/home/ubuntu/XAU_Bot|${BOT_DIR}|g" \
+        -e "s|/home/ubuntu|/home/${INSTALL_USER}|g" \
+        -e "s|User=ubuntu|User=${INSTALL_USER}|g" \
+        -e "s|Group=ubuntu|Group=${INSTALL_USER}|g" \
+        -e "s|8443|${API_PORT}|g" \
+        "$1"
+}
+
 # API service
-sed \
-    -e "s|/home/ubuntu|/home/${INSTALL_USER}|g" \
-    -e "s|User=ubuntu|User=${INSTALL_USER}|g" \
-    -e "s|Group=ubuntu|Group=${INSTALL_USER}|g" \
-    -e "s|8443|${API_PORT}|g" \
-    "${SYSTEMD_DIR}/xaubot-api.service" \
+patch_service "${SYSTEMD_DIR}/xaubot-api.service" \
     > /etc/systemd/system/xaubot-api.service
 
 # Worker service (if exists)
 if [[ -f "${SYSTEMD_DIR}/xaubot-worker.service" ]]; then
-    sed \
-        -e "s|/home/ubuntu|/home/${INSTALL_USER}|g" \
-        -e "s|User=ubuntu|User=${INSTALL_USER}|g" \
-        -e "s|Group=ubuntu|Group=${INSTALL_USER}|g" \
-        "${SYSTEMD_DIR}/xaubot-worker.service" \
+    patch_service "${SYSTEMD_DIR}/xaubot-worker.service" \
         > /etc/systemd/system/xaubot-worker.service
 fi
 
 systemctl daemon-reload
 systemctl enable xaubot-api
-systemctl start  xaubot-api
-echo "  xaubot-api service installed and started."
+
+echo "  Starting xaubot-api service..."
+if systemctl start xaubot-api; then
+    echo "  xaubot-api service started successfully."
+else
+    echo ""
+    echo "  WARNING: xaubot-api failed to start. Showing last 20 log lines:"
+    journalctl -u xaubot-api -n 20 --no-pager || true
+    echo ""
+    echo "  The service is ENABLED — it will try again on reboot."
+    echo "  Fix the issue above, then run: sudo systemctl start xaubot-api"
+    echo "  (Setup will continue so remaining steps still complete)"
+    echo ""
+fi
 
 # ── Firewall ──────────────────────────────────────────────────────────────────
 echo "[9/10] Configuring firewall (ufw)..."
