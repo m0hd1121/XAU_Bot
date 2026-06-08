@@ -1,0 +1,19 @@
+# XAU/USD Price Action Bot — Python Dependencies
+# Core: minimal and production-grade
+
+# Data & numerics
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Configuration
+PyYAML>=6.0
+
+# Optional: for live/paper trading MT5 integration
+# MetaTrader5>=5.0.45  # Windows only
+
+# Optional: for REST API feeds
+# requests>=2.31.0
+# websocket-client>=1.6.0
+
+# Optional: enhanced reporting (charts)
+# matplotlib>=3.7.0
