@@ -265,7 +265,7 @@ async def refresh_token(
     return await _issue_token_pair(user, db, request)
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Revoke refresh token")
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_model=None, summary="Revoke refresh token")
 async def logout(
     body: LogoutRequest,
     db: AsyncSession = Depends(get_db),
@@ -289,6 +289,7 @@ async def logout(
 @router.post(
     "/logout-all",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Revoke all refresh tokens for this user",
 )
 async def logout_all(
@@ -313,6 +314,7 @@ async def logout_all(
 @router.post(
     "/change-password",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Change own password",
 )
 async def change_password(
@@ -360,6 +362,7 @@ async def setup_2fa(
 @router.post(
     "/2fa/enable",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Activate 2FA after verifying TOTP code",
 )
 async def enable_2fa(
@@ -390,6 +393,7 @@ async def enable_2fa(
 @router.post(
     "/2fa/disable",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Disable 2FA",
 )
 async def disable_2fa(
@@ -504,6 +508,7 @@ async def biometric_login(
 @router.post(
     "/biometric/revoke",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Revoke biometric token for a specific device",
 )
 async def biometric_revoke(

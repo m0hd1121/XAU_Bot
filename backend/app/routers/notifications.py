@@ -122,6 +122,7 @@ async def register_device(
 @router.post(
     "/device/unregister",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Unregister device",
 )
 async def unregister_device(
@@ -195,6 +196,7 @@ async def get_preferences(
 @router.put(
     "/preferences",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
     summary="Update notification preferences",
 )
 async def update_preferences(
