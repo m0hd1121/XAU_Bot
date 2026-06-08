@@ -2,6 +2,7 @@
 // XAUBot – Fetches learning stats, patterns, validation. Polls every 60s.
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import Foundation
 import SwiftUI
 

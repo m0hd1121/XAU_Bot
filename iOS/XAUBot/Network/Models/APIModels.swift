@@ -184,7 +184,7 @@ struct AccountInfo: Codable {
 
 struct TradeRecord: Codable, Identifiable {
     let id:            Int        // ticket number
-    let ticket:        Int
+    var ticket:        Int { id }
     let symbol:        String
     let direction:     String     // "BUY" | "SELL"
     let lots:          Double
@@ -211,7 +211,6 @@ struct TradeRecord: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id            = "ticket"
-        case ticket
         case symbol
         case direction
         case lots

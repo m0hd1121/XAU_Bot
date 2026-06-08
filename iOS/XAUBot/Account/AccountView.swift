@@ -2,6 +2,7 @@
 // XAUBot – Trading Account Management
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import SwiftUI
 
 struct AccountView: View {

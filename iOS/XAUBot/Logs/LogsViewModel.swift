@@ -2,6 +2,7 @@
 // XAUBot – Log Viewer ViewModel
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import Foundation
 import SwiftUI
 

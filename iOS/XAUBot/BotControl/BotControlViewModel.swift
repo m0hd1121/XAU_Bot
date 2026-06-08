@@ -2,6 +2,7 @@
 // XAUBot – ViewModel for bot control panel: actions, confirmation, status
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import Foundation
 import SwiftUI
 

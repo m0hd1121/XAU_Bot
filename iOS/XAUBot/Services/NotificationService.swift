@@ -2,6 +2,7 @@
 // XAUBot – Push notification manager: permission, token, local notifications
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import Foundation
 import UserNotifications
 import UIKit

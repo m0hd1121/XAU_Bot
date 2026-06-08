@@ -2,6 +2,7 @@
 // XAUBot – Toast notification overlay with auto-dismiss and slide-in animation
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import SwiftUI
 
 // MARK: - Toast Type

@@ -2,6 +2,7 @@
 // XAUBot – Push Notification Preferences
 // iOS 17+  |  Swift 5.9
 
+import Combine
 import SwiftUI
 
 struct NotificationPreferencesView: View {

@@ -58,11 +58,4 @@ extension BotStatus {
         return .unknown
     }
 
-    var statusLabel: String {
-        if emergencyStopped { return "Emergency Stop" }
-        if maintenanceMode  { return "Maintenance" }
-        if paused           { return "Paused" }
-        if running          { return "Running" }
-        return "Stopped"
-    }
 }
