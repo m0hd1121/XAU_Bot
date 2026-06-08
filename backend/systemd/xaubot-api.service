@@ -1,0 +1,56 @@
+[Unit]
+Description=XAU Bot Control API (FastAPI + Uvicorn)
+Documentation=https://github.com/xaubot/api
+After=network-online.target
+Wants=network-online.target
+# Soft dependency on the bot service — API should run even if bot is stopped
+Wants=xaubot.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/XAU_Bot/backend
+
+# Load environment configuration from .env
+EnvironmentFile=/home/ubuntu/XAU_Bot/backend/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Start Uvicorn with TLS
+ExecStart=/home/ubuntu/XAU_Bot/backend/.venv/bin/uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port 8443 \
+    --ssl-keyfile /etc/ssl/xaubot/private.key \
+    --ssl-certfile /etc/ssl/xaubot/cert.pem \
+    --workers 1 \
+    --log-level info \
+    --access-log \
+    --proxy-headers \
+    --forwarded-allow-ips='127.0.0.1'
+
+# Graceful shutdown
+ExecStop=/bin/kill -s SIGTERM $MAINPID
+TimeoutStopSec=30
+
+# Restart policy — always restart on crash
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# Output to dedicated log files
+StandardOutput=append:/home/ubuntu/XAU_Bot/backend/logs/api.log
+StandardError=append:/home/ubuntu/XAU_Bot/backend/logs/api-error.log
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+# Allow read/write access to the entire bot directory
+ReadWritePaths=/home/ubuntu/XAU_Bot
+ReadWritePaths=/etc/ssl/xaubot
+
+[Install]
+WantedBy=multi-user.target

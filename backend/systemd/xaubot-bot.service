@@ -1,0 +1,39 @@
+[Unit]
+Description=XAU Bot Trading Engine
+Documentation=https://github.com/xaubot/bot
+After=network.target
+# The bot is independent of the API — it can run standalone
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/XAU_Bot
+
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Mode is set in config.yaml (backtest | paper | live)
+# The API can start/stop this service via systemctl or subprocess
+ExecStart=/home/ubuntu/XAU_Bot/.venv/bin/python main.py
+ExecStop=/bin/kill -s SIGTERM $MAINPID
+TimeoutStopSec=30
+
+# Only restart on failure — don't restart if the bot exits cleanly
+# (e.g., after a completed backtest)
+Restart=on-failure
+RestartSec=15
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+StandardOutput=append:/home/ubuntu/XAU_Bot/logs/xau_bot.log
+StandardError=append:/home/ubuntu/XAU_Bot/logs/xau_bot.log
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/XAU_Bot
+
+[Install]
+WantedBy=multi-user.target

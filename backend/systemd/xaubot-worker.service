@@ -1,0 +1,53 @@
+[Unit]
+Description=XAU Bot WebSocket Background Worker
+Documentation=https://github.com/xaubot/api
+After=network-online.target xaubot-api.service
+Wants=network-online.target
+# The worker depends on the API being up (shares the DB and bot_service)
+Requires=xaubot-api.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/XAU_Bot/backend
+
+EnvironmentFile=/home/ubuntu/XAU_Bot/backend/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# The worker runs the same ASGI app but on an internal port used only
+# for background tasks.  The WebSocket broadcasting is handled by the
+# ws_manager background tasks started inside the lifespan of the main app,
+# so this unit is provided as a standalone fallback in case the operator
+# wants to run the background worker as a separate process.
+#
+# By default it just starts the full app on a second internal port.
+# The WebSocket broadcasting tasks are also started inside the main app,
+# so in a single-worker deployment this service is optional.
+ExecStart=/home/ubuntu/XAU_Bot/backend/.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 \
+    --port 8444 \
+    --workers 1 \
+    --log-level info \
+    --no-access-log
+
+ExecStop=/bin/kill -s SIGTERM $MAINPID
+TimeoutStopSec=30
+
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+StandardOutput=append:/home/ubuntu/XAU_Bot/backend/logs/worker.log
+StandardError=append:/home/ubuntu/XAU_Bot/backend/logs/worker-error.log
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/XAU_Bot
+
+[Install]
+WantedBy=multi-user.target

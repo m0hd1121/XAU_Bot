@@ -1,0 +1,52 @@
+# ============================================================
+# XAU Bot Control API — Backend Dependencies
+# ============================================================
+
+# Web framework
+fastapi==0.111.1
+uvicorn[standard]==0.30.1
+
+# Pydantic settings (for config.py)
+pydantic==2.7.4
+pydantic-settings==2.3.4
+
+# Database (async SQLite)
+sqlalchemy==2.0.31
+aiosqlite==0.20.0
+alembic==1.13.2
+
+# Authentication & security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pyotp==2.9.0
+cryptography==42.0.8
+
+# HTTP client (APNs, outbound requests)
+httpx==0.27.0
+
+# System monitoring
+psutil==5.9.8
+
+# Configuration file parsing
+PyYAML==6.0.2
+
+# Redis (optional fallback for rate-limiter / brute-force tracker)
+redis==5.0.7
+
+# Multipart / file uploads
+python-multipart==0.0.9
+
+# Background task scheduling
+apscheduler==3.10.4
+
+# Numeric (analytics computations)
+numpy==1.26.4
+
+# Templating (not strictly needed but useful for email-style alerts)
+jinja2==3.1.4
+
+# Date utilities
+python-dateutil==2.9.0
+
+# Structured logging
+structlog==24.2.0
