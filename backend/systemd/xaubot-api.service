@@ -39,9 +39,10 @@ RestartSec=5
 StartLimitIntervalSec=60
 StartLimitBurst=5
 
-# Output to dedicated log files
-StandardOutput=append:/home/ubuntu/XAU_Bot/backend/logs/api.log
-StandardError=append:/home/ubuntu/XAU_Bot/backend/logs/api-error.log
+# Send stdout/stderr to the systemd journal (avoids root-owned log file conflict)
+# Use: journalctl -u xaubot-api -f
+StandardOutput=journal
+StandardError=journal
 
 # Security hardening
 NoNewPrivileges=yes
