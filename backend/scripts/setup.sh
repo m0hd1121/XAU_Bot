@@ -150,6 +150,8 @@ if [[ ! -f "${SSL_DIR}/private.key" ]]; then
 else
     echo "  TLS certificate already exists — skipping."
 fi
+# Give the service user read access to the cert files
+chown -R "${INSTALL_USER}:${INSTALL_USER}" "${SSL_DIR}"
 
 # ── Environment configuration ─────────────────────────────────────────────────
 echo "[5/10] Creating .env configuration..."
@@ -323,7 +325,8 @@ echo "[10/10] Bootstrapping admin user..."
 sleep 2  # Give API a moment to start and create DB
 
 cd "${BACKEND_DIR}"
-"${VENV}/bin/python" - << 'PYEOF'
+# Run as the service user so api.db is owned by that user from the start
+sudo -u "${INSTALL_USER}" "${VENV}/bin/python" - << 'PYEOF'
 import asyncio, sys, os
 sys.path.insert(0, os.getcwd())
 os.chdir(os.getcwd())
