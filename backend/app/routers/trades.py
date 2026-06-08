@@ -1,0 +1,146 @@
+"""
+routers/trades.py
+──────────────────
+Trade management endpoints.
+
+GET  /trades/open                   — list active / open trades
+GET  /trades/history                — paginated + filterable trade history
+GET  /trades/history/{trade_id}     — single trade with full features + AI explanation
+POST /trades/close                  — close a trade (full or partial)
+PUT  /trades/{trade_id}/modify      — modify SL / TP
+GET  /trades/{trade_id}/explain     — AI narrative for a completed trade
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+
+from app.auth.security import get_current_user, require_operator
+from app.services.bot_service import bot_service
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+
+# ── Schemas ───────────────────────────────────────────────────────────────────
+
+class CloseTradeRequest(BaseModel):
+    trade_id: int
+    partial: bool = False
+    pct: float = Field(1.0, ge=0.01, le=1.0, description="Fraction to close (1.0 = full)")
+
+
+class ModifyTradeRequest(BaseModel):
+    sl: Optional[float] = Field(None, description="New stop-loss price")
+    tp: Optional[float] = Field(None, description="New take-profit price")
+
+
+class TradeActionResponse(BaseModel):
+    ok: bool
+    trade_id: int
+    detail: str = ""
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/open", summary="List currently open trades")
+async def list_open_trades(_user=Depends(get_current_user)) -> dict:
+    trades = bot_service.get_open_trades()
+    return {
+        "trades": trades,
+        "count": len(trades),
+    }
+
+
+@router.get("/history", summary="Paginated + filterable trade history")
+async def trade_history(
+    limit:      int           = Query(50, ge=1, le=500),
+    offset:     int           = Query(0, ge=0),
+    outcome:    Optional[str] = Query(None, description="WIN | LOSS | BE"),
+    session:    Optional[str] = Query(None, description="london | new_york | asian"),
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    end_date:   Optional[str] = Query(None, description="YYYY-MM-DD"),
+    _user=Depends(get_current_user),
+) -> dict:
+    trades = bot_service.get_trade_history(
+        limit=limit,
+        offset=offset,
+        outcome=outcome,
+        session=session,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    total = bot_service.count_trades()
+    return {
+        "trades": trades,
+        "count": len(trades),
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@router.get("/history/{trade_id}", summary="Single trade with features and AI explanation")
+async def trade_detail(trade_id: int, _user=Depends(get_current_user)) -> dict:
+    trade = bot_service.get_trade_by_id(trade_id)
+    if trade is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Trade {trade_id} not found",
+        )
+    explanation = bot_service.get_trade_ai_explanation(trade_id)
+    return {
+        "trade": trade,
+        "ai_explanation": explanation,
+    }
+
+
+@router.post("/close", response_model=TradeActionResponse, summary="Close a trade")
+async def close_trade(
+    req: CloseTradeRequest,
+    _user=Depends(require_operator),
+) -> TradeActionResponse:
+    """
+    Writes a close request to the shared request file.
+    The bot picks it up on the next bar and executes the close.
+    For live/paper mode, the trade is actually closed via the broker adapter.
+    In backtest mode this has no effect on already-recorded trades.
+    """
+    result = bot_service.close_trade(req.trade_id, partial=req.partial, pct=req.pct)
+    return TradeActionResponse(
+        ok=result["ok"],
+        trade_id=req.trade_id,
+        detail="Close request queued" if result["ok"] else "Failed to queue close request",
+    )
+
+
+@router.put("/{trade_id}/modify", response_model=TradeActionResponse, summary="Modify SL/TP")
+async def modify_trade(
+    trade_id: int,
+    req: ModifyTradeRequest,
+    _user=Depends(require_operator),
+) -> TradeActionResponse:
+    if req.sl is None and req.tp is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of sl or tp must be provided",
+        )
+    result = bot_service.modify_trade(trade_id, sl=req.sl, tp=req.tp)
+    return TradeActionResponse(
+        ok=result["ok"],
+        trade_id=trade_id,
+        detail="Modify request queued",
+    )
+
+
+@router.get("/{trade_id}/explain", summary="Get AI explanation for a trade")
+async def explain_trade(trade_id: int, _user=Depends(get_current_user)) -> dict:
+    """
+    Returns the post-trade AI review narrative, decision scores, and recommendations
+    generated by the XAU Bot's explainability engine.
+    """
+    return bot_service.get_trade_ai_explanation(trade_id)
