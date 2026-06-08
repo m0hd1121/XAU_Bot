@@ -3,6 +3,7 @@
 // iOS 17+  |  Swift 5.9
 
 import Foundation
+import LocalAuthentication
 import Security
 import os.log
 
@@ -104,9 +105,9 @@ final class KeychainService {
 
         var query = baseQuery(for: key)
         SecItemDelete(query as CFDictionary)
-        query[kSecAttrAccessControl as String]  = access
-        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIAllow
-        query[kSecValueData as String]           = data
+        query[kSecAttrAccessControl as String]      = access
+        query[kSecUseAuthenticationContext as String] = LAContext()
+        query[kSecValueData as String]              = data
 
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
@@ -118,10 +119,11 @@ final class KeychainService {
 
     func retrieveBiometricProtected(for key: KeychainKey) -> Data? {
         var query = baseQuery(for: key)
-        query[kSecReturnData as String]          = true
-        query[kSecMatchLimit as String]          = kSecMatchLimitOne
-        query[kSecUseAuthenticationUI as String]  = kSecUseAuthenticationUIAllow
-        query[kSecUseOperationPrompt as String]   = "Authenticate to access XAUBot"
+        query[kSecReturnData as String]               = true
+        query[kSecMatchLimit as String]               = kSecMatchLimitOne
+        let ctx = LAContext()
+        ctx.localizedReason = "Authenticate to access XAUBot"
+        query[kSecUseAuthenticationContext as String] = ctx
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)

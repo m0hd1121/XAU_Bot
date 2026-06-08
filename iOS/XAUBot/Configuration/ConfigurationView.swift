@@ -304,7 +304,7 @@ struct ConfigurationView: View {
                 .font(AppFont.monoSmall)
                 .foregroundColor(.xauGold)
                 .frame(width: 100)
-                .onChange(of: value.wrappedValue) { _ in vm.markChanged() }
+                .onChange(of: value.wrappedValue) { vm.markChanged() }
         }
     }
 
@@ -316,7 +316,7 @@ struct ConfigurationView: View {
                 .font(AppFont.monoSmall)
                 .foregroundColor(.xauGold)
                 .frame(width: 80)
-                .onChange(of: value.wrappedValue) { _ in vm.markChanged() }
+                .onChange(of: value.wrappedValue) { vm.markChanged() }
         }
     }
 
@@ -327,7 +327,7 @@ struct ConfigurationView: View {
                 .font(AppFont.monoSmall)
                 .foregroundColor(.xauGold)
                 .frame(width: 80)
-                .onChange(of: value.wrappedValue) { _ in vm.markChanged() }
+                .onChange(of: value.wrappedValue) { vm.markChanged() }
         }
     }
 
@@ -344,7 +344,7 @@ struct ConfigurationView: View {
                 Toggle("", isOn: value)
                     .tint(.xauGold)
                     .labelsHidden()
-                    .onChange(of: value.wrappedValue) { _ in vm.markChanged() }
+                    .onChange(of: value.wrappedValue) { vm.markChanged() }
             }
             .padding(.horizontal, AppSpacing.cardPadding)
             .padding(.vertical, AppSpacing.sm)

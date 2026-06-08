@@ -27,10 +27,8 @@ final class LearningViewModel: ObservableObject {
         isLoading    = true
         errorMessage = nil
         do {
-            async let statsResult:    LearningStats  = APIClient.shared.request(Endpoint.learningStats)
-            async let regimesResult:  [RegimeStat]   = APIClient.shared.request(Endpoint.analyticsRegimes)
-
-            let (s, r) = try await (statsResult, regimesResult)
+            let s: LearningStats = try await APIClient.shared.request(Endpoint.learningStats)
+            let r: [RegimeStat]  = try await APIClient.shared.request(Endpoint.analyticsRegimes)
             stats             = s
             patterns          = s.patterns.sorted { $0.expectancy > $1.expectancy }
             validationResults = s.validationHistory

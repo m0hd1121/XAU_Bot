@@ -306,8 +306,8 @@ extension APIClient: URLSessionDelegate {
             completionHandler(.cancelAuthenticationChallenge, nil)
             return
         }
-        for i in 0..<SecTrustGetCertificateCount(trust) {
-            if let cert = SecTrustGetCertificateAtIndex(trust, i) {
+        if let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate] {
+            for cert in chain {
                 let hash = publicKeyHash(for: cert)
                 if pinnedPublicKeyHashes.contains(hash) {
                     completionHandler(.useCredential, URLCredential(trust: trust))

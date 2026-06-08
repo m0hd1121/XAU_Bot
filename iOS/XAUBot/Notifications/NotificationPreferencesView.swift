@@ -130,7 +130,7 @@ struct NotificationPreferencesView: View {
             Toggle("", isOn: push)
                 .tint(.xauGold)
                 .labelsHidden()
-                .onChange(of: push.wrappedValue) { _ in vm.markDirty() }
+                .onChange(of: push.wrappedValue) { vm.markDirty() }
         }
         .padding(.horizontal, AppSpacing.cardPadding)
         .padding(.vertical, AppSpacing.sm)
@@ -152,7 +152,7 @@ struct NotificationPreferencesView: View {
                         .font(AppFont.monoSmall)
                         .foregroundColor(.xauGold)
                         .frame(width: 80)
-                        .onChange(of: threshold.wrappedValue) { _ in vm.markDirty() }
+                        .onChange(of: threshold.wrappedValue) { vm.markDirty() }
                 }
                 .padding(.horizontal, AppSpacing.cardPadding)
                 .padding(.vertical, AppSpacing.sm)

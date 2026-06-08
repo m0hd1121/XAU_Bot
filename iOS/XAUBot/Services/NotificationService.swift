@@ -34,7 +34,7 @@ final class NotificationService: ObservableObject {
             )
             permissionGranted = granted
             if granted {
-                await registerForRemoteNotifications()
+                registerForRemoteNotifications()
             }
             logger.info("Notification permission: \(granted)")
         } catch {
@@ -50,8 +50,8 @@ final class NotificationService: ObservableObject {
 
     // MARK: - Remote Notification Registration
 
-    func registerForRemoteNotifications() async {
-        await UIApplication.shared.registerForRemoteNotifications()
+    func registerForRemoteNotifications() {
+        UIApplication.shared.registerForRemoteNotifications()
     }
 
     /// Called by AppDelegate when APNs token is received
