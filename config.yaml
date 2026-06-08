@@ -1,0 +1,139 @@
+# ============================================================
+# XAU/USD Price Action Bot — Configuration
+# ============================================================
+
+bot:
+  name: "XAU_PriceAction_Bot"
+  version: "1.0.0"
+  mode: "backtest"          # "backtest" | "paper" | "live"
+  symbol: "XAUUSD"
+  timeframe: "1H"           # Primary timeframe for structure analysis
+  htf_timeframe: "4H"       # Higher timeframe for bias
+
+# ── Data ─────────────────────────────────────────────────────
+data:
+  source: "csv"             # "csv" | "mt5" | "rest"
+  csv_path: "data/XAUUSD_H1.csv"
+  date_column: "time"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  # REST API settings (when source = "rest")
+  api_url: ""
+  api_key: ""
+  # MT5 settings (when source = "mt5")
+  mt5_server: ""
+  mt5_login: 0
+  mt5_password: ""
+
+# ── Risk Management ──────────────────────────────────────────
+risk:
+  initial_capital: 10000.0         # USD
+  risk_per_trade: 0.01             # 1% per trade (0.005–0.02 range)
+  max_risk_per_trade: 0.02         # Hard ceiling
+  daily_loss_limit: 0.03           # 3% daily — halt trading if breached
+  max_drawdown_kill: 0.10          # 10% drawdown — full stop, requires manual reset
+  min_reward_to_risk: 2.0          # Minimum R:R required to enter
+  max_open_trades: 2               # Simultaneous open positions
+  volatility_lookback: 14          # Candles for volatility range estimation
+  volatility_scale_factor: 1.5     # Scale multiplier for ATR-proxy sizing
+
+# ── Market Structure Engine ──────────────────────────────────
+market_structure:
+  swing_lookback: 5                # Candles left/right to confirm swing point
+  bos_confirmation_candles: 1      # Candles to close beyond level for BOS confirmation
+  choch_require_sweep: true        # CHoCH only valid after a liquidity sweep
+  liquidity_equal_threshold: 0.0015 # % price difference to call highs/lows "equal"
+  inducement_lookback: 20          # Candles to look back for inducement levels
+  zone_merge_threshold: 0.002      # % proximity to merge overlapping S/D zones
+  zone_max_age_candles: 200        # Discard untested zones older than this
+  min_zone_impulse_ratio: 1.5      # Impulse move must be X× the base candle range
+
+# ── Strategy Engine ──────────────────────────────────────────
+strategy:
+  require_htf_bias: true           # Only trade in HTF trend direction
+  require_session_window: true     # Only trade in defined session windows
+  entry_type: "limit"              # "market" | "limit" (limit = better fills)
+  limit_entry_buffer_pct: 0.0003   # Place limit X% into zone from edge
+  sl_buffer_pips: 3.0              # Extra SL buffer beyond swing (in price units)
+  partial_tp_pct: 0.5              # Close 50% at TP1, let rest run
+  tp1_rr: 1.5                      # First TP at 1.5R
+  tp2_rr: 3.0                      # Second TP at 3R (trail beyond)
+  use_break_even: true             # Move SL to BE after TP1 hit
+  trail_after_be: true             # Trail SL after break-even triggered
+  trail_step_pct: 0.003            # Trail step size as % of price
+
+# ── Session Windows (UTC) ────────────────────────────────────
+sessions:
+  london:
+    start: "07:00"
+    end: "12:00"
+    weight: 1.0                    # Session quality multiplier
+  new_york:
+    start: "13:00"
+    end: "17:00"
+    weight: 1.0
+  overlap:                         # London/NY overlap — highest volatility
+    start: "13:00"
+    end: "15:00"
+    weight: 1.2
+  asian:                           # Low weight — range-bound, avoid trend entries
+    start: "00:00"
+    end: "07:00"
+    weight: 0.3
+
+# ── Execution Engine ─────────────────────────────────────────
+execution:
+  spread_pips: 3.0                 # Typical XAUUSD spread in price units
+  slippage_pips: 1.5               # Max slippage on market orders
+  slippage_model: "random"         # "fixed" | "random" | "volatility_scaled"
+  commission_per_lot: 7.0          # USD per standard lot round-trip
+  lot_size: 100                    # oz per lot (XAUUSD standard)
+  min_lot: 0.01
+  max_lot: 10.0
+  lot_step: 0.01
+
+# ── Psychology Layer ─────────────────────────────────────────
+psychology:
+  max_consecutive_losses: 3        # After this many losses, reduce size
+  loss_streak_size_reduction: 0.5  # Multiply risk by this after streak
+  cooldown_candles_after_loss: 3   # Wait X candles after a loss before re-entering
+  cooldown_candles_after_kill: 48  # Wait after drawdown kill-switch fires
+  min_setup_quality_score: 0.6     # 0–1 score; reject setups below threshold
+  max_trades_per_session: 2        # Per London/NY session window
+  revenge_trade_detection: true    # Block entries that look like revenge trades
+
+# ── Backtester ───────────────────────────────────────────────
+backtest:
+  start_date: "2022-01-01"
+  end_date:   "2024-12-31"
+  commission_mode: "per_lot"       # "per_lot" | "per_trade" | "none"
+  fill_model: "next_open"          # "next_open" | "current_close" | "touch"
+  log_trades: true
+  save_equity_curve: true
+  output_dir: "reports"
+
+# ── Self-Learning Engine ─────────────────────────────────────
+learning:
+  enabled: false                    # Set true to activate the learning layer
+  db_path: "data/learning.db"      # SQLite database for trade history
+  analysis_every_n_trades: 50      # Run full pattern analysis every N trades
+  min_trades_before_update: 30     # Don't apply learned filters until N trades
+  adaptive_threshold: true         # Use learned confidence as an entry filter
+  min_confidence_threshold: 0.45   # Below this → setup rejected (when enabled)
+  min_pattern_samples: 20          # Min trades before a pattern is "significant"
+  decay_halflife: 500              # Exponential decay half-life (in trades)
+  # Validation settings
+  validation:
+    min_is_trades: 30              # Minimum in-sample trades for validation
+    min_oos_trades: 10             # Minimum out-of-sample trades
+    oos_pct: 0.20                  # Hold-out fraction (20%)
+    wf_window_trades: 60           # Walk-forward IS window
+    wf_step_trades: 20             # Walk-forward step size
+    max_overfit_score: 0.50        # Reject if OOS degrades more than 50%
+    min_oos_ratio: 0.40            # OOS expectancy must be ≥40% of IS
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  level: "INFO"                    # DEBUG | INFO | WARNING | ERROR
+  log_to_file: true
+  log_file: "logs/xau_bot.log"
+  log_trades_file: "logs/trades.csv"

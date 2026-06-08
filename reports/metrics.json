@@ -1,0 +1,79 @@
+{
+  "initial_capital": 10000.0,
+  "final_equity": 10345.58,
+  "total_return_pct": 3.46,
+  "cagr_pct": 1.25,
+  "total_trades": 26,
+  "trading_days": 998,
+  "winners": 10,
+  "losers": 16,
+  "win_rate_pct": 38.5,
+  "avg_winner": 67.76,
+  "avg_loser": -20.75,
+  "largest_winner": 111.64,
+  "largest_loser": -74.81,
+  "best_r": 1.47,
+  "worst_r": -0.67,
+  "profit_factor": 2.041,
+  "expectancy_r": 0.226,
+  "expectancy_dollar": 13.29,
+  "sharpe_ratio": 3.732,
+  "calmar_ratio": 0.72,
+  "max_drawdown_pct": 1.74,
+  "max_drawdown_dollar": 178.29,
+  "avg_drawdown_pct": 0.55,
+  "recovery_factor": 1.938,
+  "max_consec_wins": 3,
+  "max_consec_losses": 5,
+  "by_session": {
+    "london": {
+      "trades": 19,
+      "win_rate": 31.57894736842105,
+      "total_pnl": 183.92,
+      "avg_pnl": 9.68
+    },
+    "overlap": {
+      "trades": 4,
+      "win_rate": 50.0,
+      "total_pnl": 27.11,
+      "avg_pnl": 6.78
+    },
+    "new_york": {
+      "trades": 3,
+      "win_rate": 66.66666666666666,
+      "total_pnl": 134.56,
+      "avg_pnl": 44.85
+    }
+  },
+  "by_direction": {
+    "long": {
+      "trades": 10,
+      "win_rate": 50.0,
+      "total_pnl": 192.38,
+      "avg_pnl": 19.24
+    },
+    "short": {
+      "trades": 16,
+      "win_rate": 31.25,
+      "total_pnl": 153.21,
+      "avg_pnl": 9.58
+    }
+  },
+  "monthly_pnl": {
+    "2022-01": 180.66,
+    "2022-02": 78.5,
+    "2022-08": -15.98,
+    "2022-12": -55.75,
+    "2023-01": -26.74,
+    "2023-08": -5.02,
+    "2023-09": -32.94,
+    "2023-11": 155.69,
+    "2023-12": -9.96,
+    "2024-01": -36.29,
+    "2024-02": 49.03,
+    "2024-03": -10.08,
+    "2024-06": -39.2,
+    "2024-07": 34.07,
+    "2024-09": 79.6
+  }
+}
