@@ -181,12 +181,14 @@ sudo apt update && sudo apt install -y git
 # Download the bot code
 git clone https://github.com/m0hd1121/xau_bot.git
 
-# Go into the folder
+# Go into the folder (it will be called xau_bot — all lowercase)
 cd xau_bot
 
 # Check you're on the right version
 git checkout claude/xauusd-price-action-bot-T80IJ
 ```
+
+> **Note:** The folder on your VPS will be called `xau_bot` (lowercase). That's fine — the setup script automatically detects where it lives, so the name doesn't matter.
 
 ### Option B — Upload from Your Mac (Alternative)
 
@@ -808,6 +810,26 @@ You should see port `8443` listed as `ALLOW`. If not:
 ```bash
 sudo ufw allow 8443/tcp
 sudo ufw reload
+```
+
+---
+
+### "No such file or directory: requirements.txt" During Setup
+
+This means the setup script couldn't find the project files — usually because the cloned folder name didn't match what the old script expected.
+
+The updated setup script fixes this by auto-detecting its location. Pull the latest version and re-run:
+
+```bash
+cd ~/xau_bot   # or whatever folder you cloned into
+git pull origin claude/xauusd-price-action-bot-T80IJ
+sudo bash backend/scripts/setup.sh
+```
+
+If you're still getting the error, check that you're running the script from inside the project folder and that the `backend/` directory exists:
+```bash
+ls ~/xau_bot/backend/
+# You should see: app/ scripts/ systemd/ requirements.txt .env (etc.)
 ```
 
 ---

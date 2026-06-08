@@ -30,8 +30,15 @@
 
 set -euo pipefail
 
+# ── Auto-detect project root from script location ─────────────────────────────
+# Works regardless of what the cloned folder is named (XAU_Bot, xau_bot, etc.)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$(dirname "${SCRIPT_DIR}")"   # backend/scripts/../  = backend/
+BOT_DIR="$(dirname "${BACKEND_DIR}")"      # backend/../           = project root
+
 # ── Defaults ──────────────────────────────────────────────────────────────────
-INSTALL_USER="ubuntu"
+# Default user = whoever owns the project directory
+INSTALL_USER="$(stat -c '%U' "${BOT_DIR}" 2>/dev/null || echo 'ubuntu')"
 API_PORT="8443"
 DOMAIN="$(hostname 2>/dev/null || echo 'xaubot')"
 
@@ -44,9 +51,6 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
-
-BOT_DIR="/home/${INSTALL_USER}/XAU_Bot"
-BACKEND_DIR="${BOT_DIR}/backend"
 VENV="${BACKEND_DIR}/.venv"
 SSL_DIR="/etc/ssl/xaubot"
 LOG_DIR="${BACKEND_DIR}/logs"
