@@ -211,7 +211,7 @@ extension Endpoint {
         case .restartServiceById(let name):    return "/api/v1/vps/services/\(name)/restart"
 
         // Logs
-        case .logs:                            return "/api/v1/logs"
+        case .logs(let type, _, _, _, _):      return "/api/v1/logs/\(type)"
         case .exportLogs(let type):            return "/api/v1/logs/export/\(type)"
 
         // Backup
@@ -284,9 +284,8 @@ extension Endpoint {
             }
             return items
 
-        case .logs(let type, let level, let search, let page, let pageSize):
+        case .logs(_, let level, let search, let page, let pageSize):
             var items: [URLQueryItem] = [
-                .init(name: "type",      value: type),
                 .init(name: "page",      value: "\(page)"),
                 .init(name: "page_size", value: "\(pageSize)")
             ]
