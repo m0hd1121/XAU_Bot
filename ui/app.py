@@ -11,6 +11,8 @@ import os
 import io
 import json
 import logging
+import signal
+import subprocess
 import time
 from copy import deepcopy
 from datetime import datetime, date
@@ -286,7 +288,8 @@ def render_sidebar() -> str:
         st.markdown('<div class="section-header">Navigation</div>', unsafe_allow_html=True)
         page = st.radio(
             "",
-            ["📊  Dashboard", "🔬  Backtest", "⚙️  Configuration", "📋  Trade Log"],
+            ["🤖  Bot Control", "📈  Live Trading",
+             "📊  Backtest Results", "🔬  Backtest", "⚙️  Configuration", "📋  Trade Log"],
             label_visibility="collapsed",
         )
 
@@ -901,13 +904,311 @@ def page_trade_log():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Helpers: bot process management
+# ─────────────────────────────────────────────────────────────────────────────
+
+PID_FILE  = ROOT / "bot.pid"
+VENV_PY   = ROOT / ".venv" / "bin" / "python"
+BOT_LOG   = ROOT / "logs" / "xau_bot.log"
+SNAP_FILE = ROOT / "data" / "account_snapshot.json"
+TRADES_FILE = ROOT / "data" / "open_trades.json"
+
+
+def _read_pid() -> int | None:
+    try:
+        return int(PID_FILE.read_text().strip())
+    except Exception:
+        return None
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _bot_running() -> bool:
+    pid = _read_pid()
+    return pid is not None and _pid_alive(pid)
+
+
+def _bot_start(mode: str = "paper") -> str:
+    if _bot_running():
+        return "already_running"
+    py = str(VENV_PY) if VENV_PY.exists() else "python3"
+    log_path = ROOT / "logs" / "bot_startup.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "a") as lf:
+        proc = subprocess.Popen(
+            [py, str(ROOT / "main.py"), "--mode", mode],
+            cwd=str(ROOT),
+            stdout=lf, stderr=lf,
+            start_new_session=True,
+        )
+    PID_FILE.write_text(str(proc.pid))
+    return "started"
+
+
+def _bot_stop() -> str:
+    pid = _read_pid()
+    if pid is None:
+        return "not_running"
+    try:
+        os.kill(pid, signal.SIGTERM)
+        return "stopped"
+    except ProcessLookupError:
+        PID_FILE.unlink(missing_ok=True)
+        return "not_running"
+
+
+def _read_snapshot() -> dict:
+    try:
+        return json.loads(SNAP_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _read_open_trades() -> list:
+    try:
+        return json.loads(TRADES_FILE.read_text())
+    except Exception:
+        return []
+
+
+def _tail_log(n: int = 60) -> str:
+    try:
+        lines = BOT_LOG.read_text(errors="replace").splitlines()
+        return "\n".join(lines[-n:])
+    except Exception:
+        return "(log not found)"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Page: Bot Control
+# ─────────────────────────────────────────────────────────────────────────────
+
+def page_bot_control():
+    st.markdown('<h2 style="color:#e6edf3; margin-bottom:4px;">Bot Control</h2>', unsafe_allow_html=True)
+
+    running = _bot_running()
+    pid     = _read_pid()
+    snap    = _read_snapshot()
+
+    # ── Status hero ────────────────────────────────────────────────────────────
+    if running:
+        st.markdown(f"""
+        <div style="background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.3);
+                    border-radius:12px; padding:20px; text-align:center; margin-bottom:20px;">
+            <div style="font-size:36px;">🟢</div>
+            <div style="font-size:20px; font-weight:700; color:#3fb950; margin:6px 0;">RUNNING</div>
+            <div style="font-size:12px; color:#8b949e;">PID {pid}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="background:rgba(248,81,73,0.08); border:1px solid rgba(248,81,73,0.3);
+                    border-radius:12px; padding:20px; text-align:center; margin-bottom:20px;">
+            <div style="font-size:36px;">🔴</div>
+            <div style="font-size:20px; font-weight:700; color:#f85149; margin:6px 0;">STOPPED</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── Account snapshot ───────────────────────────────────────────────────────
+    if snap:
+        equity  = snap.get("equity", 0)
+        balance = snap.get("balance", 0)
+        ts      = snap.get("timestamp", "")[:19].replace("T", " ")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(metric_card("Equity", f"${equity:,.2f}", f"as of {ts}",
+                                    "metric-pos" if equity >= balance else "metric-neg"),
+                        unsafe_allow_html=True)
+        with c2:
+            st.markdown(metric_card("Balance", f"${balance:,.2f}"), unsafe_allow_html=True)
+        with c3:
+            pnl = equity - balance
+            c = "metric-pos" if pnl >= 0 else "metric-neg"
+            st.markdown(metric_card("Unrealized P&L", f"${pnl:+,.2f}", color_class=c),
+                        unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Control buttons ────────────────────────────────────────────────────────
+    cfg  = load_config()
+    mode = cfg.get("bot", {}).get("mode", "paper")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        if st.button("▶  Start", disabled=running, use_container_width=True):
+            result = _bot_start(mode)
+            st.success(f"Bot started (mode={mode})" if result == "started" else "Already running")
+            time.sleep(1)
+            st.rerun()
+
+    with col2:
+        st.markdown("""<style>.stop-btn > button{background:#b91c1c!important;border-color:#ef4444!important;}</style>""",
+                    unsafe_allow_html=True)
+        if st.button("⏹  Stop", disabled=not running, use_container_width=True):
+            _bot_stop()
+            st.warning("Stop signal sent")
+            time.sleep(1)
+            st.rerun()
+
+    with col3:
+        if st.button("🔄  Restart", use_container_width=True):
+            _bot_stop()
+            time.sleep(2)
+            _bot_start(mode)
+            st.success("Restarted")
+            time.sleep(1)
+            st.rerun()
+
+    with col4:
+        if st.button("🔃  Refresh", use_container_width=True):
+            st.rerun()
+
+    # ── Mode selector ──────────────────────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Operating Mode</div>', unsafe_allow_html=True)
+    new_mode = st.selectbox("Mode (restart required to apply)", ["paper", "live", "backtest"],
+                             index=["paper","live","backtest"].index(mode),
+                             disabled=running)
+    if not running and new_mode != mode:
+        cfg2 = deepcopy(cfg)
+        cfg2["bot"]["mode"] = new_mode
+        save_config(cfg2)
+        st.success(f"Mode saved to {new_mode} — click Start to apply")
+
+    # ── Live log tail ──────────────────────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Live Log (last 60 lines)</div>', unsafe_allow_html=True)
+    log_text = _tail_log(60)
+    st.markdown(f'<div class="log-box">{log_text}</div>', unsafe_allow_html=True)
+
+    # Auto-refresh every 10 s while running
+    if running:
+        time.sleep(10)
+        st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Page: Live Trading
+# ─────────────────────────────────────────────────────────────────────────────
+
+def page_live_trading():
+    st.markdown('<h2 style="color:#e6edf3; margin-bottom:4px;">Live Trading</h2>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#8b949e; font-size:13px; margin-bottom:20px;">Real-time paper trading monitor</div>',
+                unsafe_allow_html=True)
+
+    snap   = _read_snapshot()
+    trades = _read_open_trades()
+
+    if not snap:
+        st.info("No account snapshot found. Start the bot first.")
+        return
+
+    # ── Account strip ──────────────────────────────────────────────────────────
+    equity  = float(snap.get("equity",  0))
+    balance = float(snap.get("balance", 0))
+    broker  = snap.get("broker", "Paper Trading")
+    server  = snap.get("server", "—")
+    ts      = snap.get("timestamp", "")[:19].replace("T", " ")
+    conn    = snap.get("connected", False)
+
+    conn_badge = badge("CONNECTED", "green") if conn else badge("DISCONNECTED", "red")
+    st.markdown(f"""
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px;
+                padding:14px 20px; margin-bottom:16px; display:flex; align-items:center; gap:12px;">
+        <div>{conn_badge}</div>
+        <div style="color:#8b949e; font-size:12px;">{broker} · {server} · updated {ts} UTC</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    unreal_pnl = sum(float(t.get("pnl", 0)) for t in trades)
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(metric_card("Equity", f"${equity:,.2f}"), unsafe_allow_html=True)
+    with c2:
+        st.markdown(metric_card("Balance", f"${balance:,.2f}"), unsafe_allow_html=True)
+    with c3:
+        c = "metric-pos" if unreal_pnl >= 0 else "metric-neg"
+        st.markdown(metric_card("Unrealized P&L", f"${unreal_pnl:+,.2f}", color_class=c),
+                    unsafe_allow_html=True)
+    with c4:
+        st.markdown(metric_card("Open Trades", str(len(trades))), unsafe_allow_html=True)
+
+    # ── Open trades table ──────────────────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Open Positions</div>', unsafe_allow_html=True)
+
+    if not trades:
+        st.markdown("""
+        <div style="background:#161b22; border:1px solid #30363d; border-radius:10px;
+                    padding:30px; text-align:center;">
+            <div style="color:#8b949e; font-size:14px;">No open positions</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        rows = []
+        for t in trades:
+            pnl = float(t.get("pnl", 0))
+            cur = t.get("current_price") or 0
+            rows.append({
+                "Ticket":    t.get("ticket", "—"),
+                "Direction": t.get("direction", "—"),
+                "Lots":      t.get("lots", 0),
+                "Open @":    t.get("open_price", 0),
+                "Current":   cur,
+                "SL":        t.get("stop_loss") or "—",
+                "TP":        t.get("take_profit") or "—",
+                "P&L $":     round(pnl, 2),
+                "Session":   t.get("session") or "—",
+                "Open Time": str(t.get("open_time", ""))[:16],
+            })
+        df_t = pd.DataFrame(rows)
+        st.dataframe(
+            df_t.style.applymap(
+                lambda v: f"color: {'#3fb950' if v > 0 else '#f85149'}"
+                          if isinstance(v, (int, float)) else "",
+                subset=["P&L $"],
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    # ── Recent log ────────────────────────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.expander("📄 Recent Bot Log"):
+        st.markdown(f'<div class="log-box">{_tail_log(30)}</div>', unsafe_allow_html=True)
+
+    # ── Refresh controls ───────────────────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_r, col_a, _ = st.columns([1, 2, 5])
+    with col_r:
+        if st.button("🔃 Refresh Now"):
+            st.rerun()
+    with col_a:
+        auto = st.checkbox("Auto-refresh every 10s", value=False)
+
+    if auto:
+        time.sleep(10)
+        st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     page = render_sidebar()
 
-    if page == "Dashboard":
+    if page == "Bot Control":
+        page_bot_control()
+    elif page == "Live Trading":
+        page_live_trading()
+    elif page == "Backtest Results":
         page_dashboard()
     elif page == "Backtest":
         page_backtest()
