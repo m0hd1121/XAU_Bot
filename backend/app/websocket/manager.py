@@ -212,7 +212,77 @@ async def _authenticate_ws(websocket: WebSocket) -> tuple[int, str]:
         raise ValueError(f"Token rejected: {exc}") from exc
 
 
+# ── Auth via first message (iOS client sends {"type":"auth","token":"..."}) ────
+
+async def _authenticate_ws_message(websocket: WebSocket) -> tuple[int, str]:
+    """
+    Accept the WebSocket first, then wait up to 10 s for a JSON auth message.
+    iOS sends: {"type": "auth", "token": "<access_token>"}
+    """
+    await websocket.accept()
+    try:
+        raw = await asyncio.wait_for(websocket.receive_text(), timeout=10)
+        msg = json.loads(raw)
+        if msg.get("type") != "auth":
+            await websocket.close(code=4001, reason="Expected auth message")
+            raise ValueError("Expected auth message")
+        token = msg.get("token", "")
+        if not token:
+            await websocket.close(code=4001, reason="Missing token")
+            raise ValueError("Missing token")
+        from app.auth.security import decode_token, TOKEN_TYPE_ACCESS
+        payload = decode_token(token, TOKEN_TYPE_ACCESS)
+        return int(payload["sub"]), payload.get("usr", "unknown")
+    except (asyncio.TimeoutError, json.JSONDecodeError, KeyError) as exc:
+        await websocket.close(code=4001, reason="Auth failed")
+        raise ValueError(f"Auth failed: {exc}") from exc
+
+
 # ── WebSocket endpoint ────────────────────────────────────────────────────────
+
+@ws_router.websocket("/dashboard")
+async def dashboard_feed(websocket: WebSocket) -> None:
+    """
+    iOS app connects here: wss://host/api/v1/ws/dashboard
+    Auth via first JSON message: {"type":"auth","token":"<access_token>"}
+    """
+    client = None
+    try:
+        user_id, username = await _authenticate_ws_message(websocket)
+    except ValueError:
+        return
+
+    try:
+        client = await ws_manager.connect(websocket, user_id, username)
+
+        from app.services.bot_service import bot_service
+        try:
+            snapshot = await asyncio.wait_for(bot_service.get_dashboard_snapshot(), timeout=5)
+            await client.send(_make_message("dashboard", snapshot.model_dump()))
+        except Exception:
+            pass
+
+        while True:
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=30)
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                if msg.get("type") == "ping":
+                    await client.send(_make_message("pong", {"client_ts": msg.get("ts")}))
+            except asyncio.TimeoutError:
+                ok = await client.send(_make_message("ping", {}))
+                if not ok:
+                    break
+            except (WebSocketDisconnect, Exception):
+                break
+    except Exception as exc:
+        logger.debug("WS /dashboard exception: %s", exc)
+    finally:
+        if client:
+            ws_manager.disconnect(client.conn_id)
+
 
 @ws_router.websocket("/live")
 async def live_feed(websocket: WebSocket) -> None:
