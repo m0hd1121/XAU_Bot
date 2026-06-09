@@ -50,7 +50,7 @@ class ControlResponse(BaseModel):
         return cls(
             success=result.get("ok", result.get("success", False)),
             message=result.get("detail", result.get("message", "")),
-            data={"pid": result["pid"]} if result.get("pid") else None,
+            data=None,
         )
 
 

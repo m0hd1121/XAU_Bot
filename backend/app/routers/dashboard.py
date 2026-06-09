@@ -78,31 +78,53 @@ class AccountSnapshot(BaseModel):
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
+_SAFE_STATUS = {
+    "running": False, "paused": False, "maintenance_mode": False,
+    "emergency_stopped": False, "learning_enabled": False,
+    "pid": None, "mode": "backtest",
+    "last_heartbeat": None, "last_trade_at": None,
+    "open_trades_count": 0, "daily_pnl": 0.0, "equity": 0.0,
+}
+
+
 @router.get("/bot-status", summary="Bot status for control panel")
 async def get_bot_status(
     _current_user=Depends(get_current_user),
 ) -> dict:
-    """
-    Returns the BotStatus payload consumed by the iOS Bot Control screen.
-    Includes runtime state plus live financial metrics from the snapshot.
-    """
+    """Returns the BotStatus payload consumed by the iOS Bot Control screen."""
     from datetime import timezone
-    s    = await bot_service.get_bot_status()
-    snap = await bot_service.get_dashboard_snapshot()
-    now  = datetime.now(tz=timezone.utc).isoformat()
+    import asyncio
+
+    now = datetime.now(tz=timezone.utc).isoformat()
+
+    # Wrap everything — any exception returns a safe default so the iOS
+    # screen loads instead of hanging on a 500.
+    try:
+        s = await asyncio.wait_for(bot_service.get_bot_status(), timeout=5.0)
+    except Exception:
+        s = {}
+
+    try:
+        snap      = bot_service.get_account_snapshot()
+        equity    = float(snap.get("equity",    0.0))
+        daily_pnl = float(snap.get("daily_pnl", 0.0))
+        open_count = len(bot_service.get_open_trades())
+    except Exception:
+        equity = daily_pnl = 0.0
+        open_count = 0
+
     return {
-        "running":           s.get("running",           False),
-        "paused":            s.get("paused",            False),
-        "maintenance_mode":  s.get("maintenance_mode",  False),
-        "emergency_stopped": s.get("emergency_stopped", False),
-        "learning_enabled":  s.get("learning_enabled",  False),
+        **_SAFE_STATUS,
+        "running":           bool(s.get("running",           False)),
+        "paused":            bool(s.get("paused",            False)),
+        "maintenance_mode":  bool(s.get("maintenance_mode",  False)),
+        "emergency_stopped": bool(s.get("emergency_stopped", False)),
+        "learning_enabled":  bool(s.get("learning_enabled",  False)),
         "pid":               s.get("pid"),
-        "mode":              s.get("mode",              "backtest"),
-        "last_heartbeat":    snap.last_heartbeat.isoformat() if snap.last_heartbeat else None,
-        "last_trade_at":     snap.last_trade_time.isoformat() if snap.last_trade_time else None,
-        "open_trades_count": snap.open_trades_count,
-        "daily_pnl":         snap.daily_pnl,
-        "equity":            snap.equity,
+        "mode":              str(s.get("mode", "backtest")),
+        "open_trades_count": open_count,
+        "daily_pnl":         daily_pnl,
+        "equity":            equity,
         "updated_at":        now,
     }
 
