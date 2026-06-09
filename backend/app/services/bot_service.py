@@ -62,7 +62,7 @@ _MODIFY_REQ_FILE     = BOT_ROOT / "data" / "modify_requests.json"
 def _db_conn() -> Optional[sqlite3.Connection]:
     if not LEARNING_DB.exists():
         return None
-    conn = sqlite3.connect(str(LEARNING_DB), timeout=5)
+    conn = sqlite3.connect(str(LEARNING_DB), timeout=1)  # 1s max — prevents event-loop block
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -700,18 +700,24 @@ class BotService:
         """
         Build the full dashboard payload in iOS DashboardSnapshot format.
         Called by the REST dashboard endpoint and the WebSocket worker.
+        All blocking I/O runs in a thread pool to avoid stalling the event loop.
         """
-        bot_status  = await self.get_bot_status()
-        account     = self.get_account_snapshot()
-        metrics     = self.get_performance_metrics()
-        open_trades = self.get_open_trades()
+        # Run all blocking operations concurrently in a thread pool
+        bot_status, account, metrics, open_trades = await asyncio.gather(
+            self.get_bot_status(),
+            asyncio.to_thread(self.get_account_snapshot),
+            asyncio.to_thread(self.get_performance_metrics),
+            asyncio.to_thread(self.get_open_trades),
+        )
 
         # Fallback to active_account.json for display when no live MT5 snapshot
         if not account:
             active_path = BOT_ROOT / "data" / "active_account.json"
             if active_path.exists():
                 try:
-                    creds   = json.loads(active_path.read_text())
+                    creds   = await asyncio.to_thread(
+                        lambda: json.loads(active_path.read_text())
+                    )
                     account = {
                         "account_number": str(creds.get("login", "—")),
                         "server":         str(creds.get("server", "—")),
@@ -720,7 +726,8 @@ class BotService:
                 except Exception:
                     pass
 
-        initial_capital = self.read_config().get("risk", {}).get("initial_capital", 10000.0)
+        cfg = await asyncio.to_thread(self.read_config)
+        initial_capital = cfg.get("risk", {}).get("initial_capital", 10000.0)
         balance   = float(account.get("balance",  initial_capital))
         equity    = float(account.get("equity",   balance))
         connected = bool(account.get("connected", False))

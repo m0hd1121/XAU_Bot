@@ -200,3 +200,16 @@ async def disable_learning(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.disable_learning()
     await _log_action(user, "learning_disable", result)
     return ControlResponse.from_result(result)
+
+
+@router.post(
+    "/services/{service_name}/restart",
+    response_model=ControlResponse,
+    summary="Restart a named system service (iOS Bot Control screen)",
+)
+async def restart_service(service_name: str, user=Depends(require_admin)) -> ControlResponse:
+    """Restart a systemd service by name (e.g. 'xaubot', 'xaubot-api', 'xaubot-worker')."""
+    from app.services.vps_service import vps_service
+    result = vps_service.restart_service(service_name)
+    await _log_action(user, f"service_restart:{service_name}", result)
+    return ControlResponse.from_result(result)
