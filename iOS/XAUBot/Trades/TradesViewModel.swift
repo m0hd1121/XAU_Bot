@@ -52,6 +52,7 @@ final class TradesViewModel: ObservableObject {
         liveLoading = true
         do {
             liveTrades = try await APIClient.shared.request(Endpoint.openTrades)
+        } catch is CancellationError {
         } catch {
             ToastManager.shared.show(error.localizedDescription, type: .error)
         }
@@ -106,6 +107,7 @@ final class TradesViewModel: ObservableObject {
             filteredWinRate    = response.winRate
             canLoadMore        = currentPage < response.totalPages
             currentPage       += 1
+        } catch is CancellationError {
         } catch {
             ToastManager.shared.show(error.localizedDescription, type: .error)
         }

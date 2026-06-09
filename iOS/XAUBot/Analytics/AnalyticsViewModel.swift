@@ -49,6 +49,7 @@ final class AnalyticsViewModel: ObservableObject {
             drawdown       = data.drawdown
             sessionStats   = data.sessionStats
             regimeStats    = data.regimeStats
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

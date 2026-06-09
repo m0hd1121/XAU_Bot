@@ -194,7 +194,9 @@ final class APIClient: NSObject {
             }
 
         } catch let error as APIError { throw error }
+        catch is CancellationError { throw CancellationError() }
         catch let urlError as URLError {
+            if urlError.code == .cancelled { throw CancellationError() }
             if retryCount < 3, isRetryable(urlError) {
                 let delay = pow(2.0, Double(retryCount)) * 0.5
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))

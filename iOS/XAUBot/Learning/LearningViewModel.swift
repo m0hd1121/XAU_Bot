@@ -38,6 +38,7 @@ final class LearningViewModel: ObservableObject {
             let f = DateFormatter()
             f.timeStyle = .short
             lastRefreshTime = f.string(from: Date())
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

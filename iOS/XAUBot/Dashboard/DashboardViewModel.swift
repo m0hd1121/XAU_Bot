@@ -68,6 +68,8 @@ final class DashboardViewModel: ObservableObject {
         do {
             let snapshot: DashboardSnapshot = try await APIClient.shared.request(Endpoint.dashboardSnapshot)
             apply(snapshot)
+        } catch is CancellationError {
+            // previous request was cancelled by pull-to-refresh or navigation — not an error
         } catch {
             errorMessage = error.localizedDescription
         }

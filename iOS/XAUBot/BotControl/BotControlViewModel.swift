@@ -29,6 +29,8 @@ final class BotControlViewModel: ObservableObject {
         isLoading = true
         do {
             botStatus = try await APIClient.shared.request(Endpoint.botStatus)
+        } catch is CancellationError {
+            // ignore — task was cancelled by navigation or pull-to-refresh
         } catch {
             errorMessage = error.localizedDescription
         }
