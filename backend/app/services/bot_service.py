@@ -379,6 +379,14 @@ class BotService:
             _FLAG_MAINT.unlink()
         return {"ok": True, "detail": "Maintenance mode disabled"}
 
+    async def set_mode(self, mode: str) -> dict:
+        if mode not in ("backtest", "paper", "live"):
+            return {"ok": False, "detail": f"Invalid mode '{mode}'. Must be backtest, paper, or live."}
+        cfg = self.read_config()
+        cfg.setdefault("bot", {})["mode"] = mode
+        self.write_config(cfg)
+        return {"ok": True, "detail": f"Mode set to {mode}"}
+
     async def enable_learning(self) -> dict:
         cfg = self.read_config()
         cfg.setdefault("learning", {})["enabled"] = True

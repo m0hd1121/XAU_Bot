@@ -32,6 +32,7 @@ enum Endpoint {
     case enableMaintenance
     case disableMaintenance
     case restartService(name: String)
+    case setBotMode(mode: String)
 
     // ── Trades ───────────────────────────────────────────────────────────────
     case openTrades
@@ -171,6 +172,7 @@ extension Endpoint {
         case .enableMaintenance:               return "/api/v1/bot/maintenance/enable"
         case .disableMaintenance:              return "/api/v1/bot/maintenance/disable"
         case .restartService(let name):        return "/api/v1/bot/services/\(name)/restart"
+        case .setBotMode:                      return "/api/v1/bot/mode"
 
         // Trades
         case .openTrades:                      return "/api/v1/trades/open"
@@ -244,7 +246,7 @@ extension Endpoint {
              .startBot, .stopBot, .restartBot, .pauseBot, .resumeBot,
              .emergencyStop, .enableLearning, .disableLearning,
              .enableMaintenance, .disableMaintenance,
-             .restartService, .restartServiceById,
+             .restartService, .restartServiceById, .setBotMode,
              .createBackup, .restoreBackup, .registerDevice,
              .addAccount, .reconnectAccount, .validateConfig,
              .closeTradePartial, .closeTrade:
@@ -327,7 +329,14 @@ extension Endpoint {
         case .updateNotificationPrefs(let p): return p
         case .modifyTrade(_, let request):    return request
         case .addAccount(let payload):        return payload
+        case .setBotMode(let mode):           return SetModePayload(mode: mode)
         default:                              return nil
         }
     }
+}
+
+// MARK: - SetModePayload
+
+private struct SetModePayload: Encodable {
+    let mode: String
 }

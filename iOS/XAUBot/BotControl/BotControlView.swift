@@ -19,6 +19,9 @@ struct BotControlView: View {
                     // Primary controls
                     primaryControls
 
+                    // Mode selector
+                    modeSelector
+
                     // Mode toggles
                     modeToggles
 
@@ -121,6 +124,64 @@ struct BotControlView: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppRadius.md))
                 .appShadow(AppShadow.lossGlow)
             }
+        }
+    }
+
+    // MARK: - Mode Selector
+
+    private let botModes = ["backtest", "paper", "live"]
+
+    private var modeSelector: some View {
+        let isRunning   = vm.botStatus?.running ?? false
+        let currentMode = vm.botStatus?.mode.lowercased() ?? "paper"
+
+        return VStack(spacing: AppSpacing.md) {
+            sectionTitle("Operating Mode")
+
+            VStack(spacing: AppSpacing.sm) {
+                Picker("Mode", selection: Binding<String>(
+                    get: { currentMode },
+                    set: { newMode in
+                        if newMode != currentMode {
+                            vm.requestSetMode(newMode)
+                        }
+                    }
+                )) {
+                    Text("Backtest").tag("backtest")
+                    Text("Paper").tag("paper")
+                    Text("Live").tag("live")
+                }
+                .pickerStyle(.segmented)
+                .disabled(isRunning)
+
+                if isRunning {
+                    Text("Stop the bot to change mode")
+                        .font(AppFont.caption)
+                        .foregroundColor(.xauTextTertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    Text(modeSublabel(currentMode))
+                        .font(AppFont.caption)
+                        .foregroundColor(.xauTextTertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .padding(AppSpacing.lg)
+            .background(Color.xauCard)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: AppRadius.lg)
+                    .strokeBorder(Color.xauBorder, lineWidth: 0.5)
+            )
+        }
+    }
+
+    private func modeSublabel(_ mode: String) -> String {
+        switch mode {
+        case "backtest": return "Replay historical data — no real-time execution"
+        case "paper":    return "Simulated trading on live prices — no real funds"
+        case "live":     return "Real execution via connected broker — use with caution"
+        default:         return ""
         }
     }
 

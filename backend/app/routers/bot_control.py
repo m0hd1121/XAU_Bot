@@ -40,6 +40,10 @@ router = APIRouter()
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+class SetModeRequest(BaseModel):
+    mode: str  # "backtest" | "paper" | "live"
+
+
 class ControlResponse(BaseModel):
     success: bool
     message: str = ""
@@ -199,6 +203,17 @@ async def enable_learning(user=Depends(require_admin)) -> ControlResponse:
 async def disable_learning(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.disable_learning()
     await _log_action(user, "learning_disable", result)
+    return ControlResponse.from_result(result)
+
+
+@router.post(
+    "/mode",
+    response_model=ControlResponse,
+    summary="Change the bot operating mode (backtest / paper / live)",
+)
+async def set_bot_mode(req: SetModeRequest, user=Depends(require_admin)) -> ControlResponse:
+    result = await bot_service.set_mode(req.mode)
+    await _log_action(user, f"set_mode:{req.mode}", result)
     return ControlResponse.from_result(result)
 
 

@@ -122,6 +122,19 @@ final class BotControlViewModel: ObservableObject {
         )
     }
 
+    func requestSetMode(_ mode: String) {
+        let label = mode.capitalized
+        confirmationConfig = ConfirmationConfig(
+            title: "Switch to \(label) Mode",
+            message: "The bot mode will be changed to \(label). You will need to restart the bot for the change to take effect.",
+            actionLabel: "Set \(label)",
+            isDestructive: false,
+            action: { [weak self] in
+                await self?.performAction("Set Mode: \(label)", endpoint: Endpoint.setBotMode(mode: mode))
+            }
+        )
+    }
+
     func requestRestartService(_ name: String, displayName: String) {
         confirmationConfig = ConfirmationConfig(
             title: "Restart \(displayName)",
