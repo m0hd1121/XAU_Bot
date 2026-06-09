@@ -259,17 +259,43 @@ class BotService:
         cfg = self.read_config()
         mode = cfg.get("bot", {}).get("mode", "backtest")
 
+        # Write log file path so we can capture startup errors
+        log_path = BOT_ROOT / "logs" / "bot_startup.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
-            proc = subprocess.Popen(
-                [python, str(BOT_SCRIPT), "--mode", mode],
-                cwd=str(BOT_ROOT),
-                start_new_session=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            with open(log_path, "a") as log_fh:
+                proc = subprocess.Popen(
+                    [python, str(BOT_SCRIPT), "--mode", mode],
+                    cwd=str(BOT_ROOT),
+                    start_new_session=True,
+                    stdout=log_fh,
+                    stderr=log_fh,
+                )
             PID_FILE.write_text(str(proc.pid))
             logger.info("Bot started pid=%d mode=%s", proc.pid, mode)
-            return {"ok": True, "detail": f"Bot started (PID {proc.pid})", "pid": proc.pid}
+
+            # Brief wait — verify the process didn't crash immediately
+            await asyncio.sleep(2)
+            try:
+                p = psutil.Process(proc.pid)
+                if not (p.is_running() and p.status() != psutil.STATUS_ZOMBIE):
+                    PID_FILE.unlink(missing_ok=True)
+                    # Try to surface the error from the log
+                    try:
+                        tail = log_path.read_text()[-500:]
+                    except Exception:
+                        tail = "(no log)"
+                    return {"ok": False, "detail": f"Bot exited immediately. Log tail: {tail}"}
+            except psutil.NoSuchProcess:
+                PID_FILE.unlink(missing_ok=True)
+                try:
+                    tail = log_path.read_text()[-500:]
+                except Exception:
+                    tail = "(no log)"
+                return {"ok": False, "detail": f"Bot process died on startup. Log tail: {tail}"}
+
+            return {"ok": True, "detail": f"Bot started in {mode} mode (PID {proc.pid})", "pid": proc.pid}
         except Exception as exc:
             logger.error("Failed to start bot: %s", exc)
             return {"ok": False, "detail": str(exc)}

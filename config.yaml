@@ -5,7 +5,7 @@
 bot:
   name: "XAU_PriceAction_Bot"
   version: "1.0.0"
-  mode: "backtest"          # "backtest" | "paper" | "live"
+  mode: "paper"             # "backtest" | "paper" | "live"
   symbol: "XAUUSD"
   timeframe: "1H"           # Primary timeframe for structure analysis
   htf_timeframe: "4H"       # Higher timeframe for bias
