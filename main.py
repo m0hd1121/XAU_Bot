@@ -97,7 +97,7 @@ def run_backtest(cfg: dict) -> None:
 def run_paper(cfg: dict) -> None:
     """
     Paper trading daemon — runs continuously, scanning for setups on live/scheduled data.
-    Keeps the process alive so the API shows 'Running'. Writes status files every 30 s.
+    Keeps the process alive so the API shows 'Running'. Writes status files every 5 s.
     Stopped cleanly by SIGTERM (the API's 'Stop' button).
     """
     import json
@@ -116,23 +116,17 @@ def run_paper(cfg: dict) -> None:
     equity  = initial_capital
     balance = initial_capital
 
-    # ── Run an initial backtest to get a realistic starting equity ──────────────
-    logger.info("Running initial analysis on historical data...")
+    # Try to restore prior equity from existing snapshot so a restart keeps continuity
+    snap_path   = data_dir / "account_snapshot.json"
+    trades_path = data_dir / "open_trades.json"
     try:
-        from xau_bot.backtester import Backtester
-        bt  = Backtester(cfg)
-        res = bt.run()
-        # Try common attribute names for final equity
-        for attr in ("final_equity", "equity", "ending_equity"):
-            if hasattr(res, attr) and getattr(res, attr):
-                equity = float(getattr(res, attr))
-                break
-        if hasattr(res, "metrics") and isinstance(res.metrics, dict):
-            equity = float(res.metrics.get("final_equity", equity))
-        balance = equity
-        logger.info("Initial analysis complete — starting equity: $%.2f", equity)
-    except Exception as exc:
-        logger.warning("Initial analysis skipped (%s) — using default capital $%.2f", exc, initial_capital)
+        import json as _json
+        prev = _json.loads(snap_path.read_text())
+        equity  = float(prev.get("equity",  equity))
+        balance = float(prev.get("balance", balance))
+        logger.info("Restored equity from previous snapshot: $%.2f", equity)
+    except Exception:
+        logger.info("Starting with initial capital: $%.2f", initial_capital)
 
     # ── Signal handling ─────────────────────────────────────────────────────────
     _alive = [True]

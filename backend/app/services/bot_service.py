@@ -275,8 +275,8 @@ class BotService:
             PID_FILE.write_text(str(proc.pid))
             logger.info("Bot started pid=%d mode=%s", proc.pid, mode)
 
-            # Brief wait — verify the process didn't crash immediately
-            await asyncio.sleep(2)
+            # Brief wait — verify the process didn't crash on import/startup
+            await asyncio.sleep(4)
             try:
                 p = psutil.Process(proc.pid)
                 if not (p.is_running() and p.status() != psutil.STATUS_ZOMBIE):
