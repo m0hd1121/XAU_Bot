@@ -3,6 +3,7 @@ broker.py — Broker connectivity abstraction.
 
 Supported adapters:
   - PaperBroker     : pure simulation, reads local JSON files
+  - DWXBroker       : DWX Connect file-bridge to MT4/MT5 running under Wine
   - MetaApiBroker   : MetaApi cloud MT5/MT4 bridge (works from Linux VPS)
   - OANDABroker     : OANDA v20 REST API (practice or live)
 
@@ -89,6 +90,156 @@ class PaperBroker(BrokerBase):
 
     def close_position(self, position_id, lots=None) -> dict:
         return {"ok": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DWX Connect Broker (file-based IPC bridge to MT4/MT5 under Wine)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DWXBroker(BrokerBase):
+    """
+    Communicates with MT4/MT5 running under Wine via the DWX Connect file bridge.
+
+    DWX Connect EA writes JSON files to MT4's MQL4/Files directory;
+    this class reads and writes those same files.
+
+    mt4_files_path: absolute path to MT4's MQL4/Files directory on the VPS.
+    Typical path:  ~/.wine-mt4/drive_c/Program Files (x86)/<broker>/MQL4/Files
+    """
+
+    _ORDER_TYPES = {
+        "BUY":       0,
+        "SELL":      1,
+        "BUYLIMIT":  2,
+        "SELLLIMIT": 3,
+        "BUYSTOP":   4,
+        "SELLSTOP":  5,
+    }
+
+    def __init__(self, mt4_files_path: str, magic: int = 88888) -> None:
+        self._files = Path(mt4_files_path).expanduser()
+        self._magic = magic
+        self._cmd_id = 0
+
+    # ── File paths ────────────────────────────────────────────────────────────
+
+    def _f(self, name: str) -> Path:
+        return self._files / name
+
+    # ── Internal: write a command and wait for acknowledgement ────────────────
+
+    def _send_command(self, payload: dict, timeout: float = 10.0) -> dict:
+        import time
+        self._cmd_id += 1
+        payload["_magic"] = self._magic
+        cmd_file = self._f(f"DWX_Commands_{self._cmd_id % 20}.txt")
+        cmd_file.write_text(json.dumps(payload))
+
+        # Wait for EA to consume the file (it deletes or empties it when done)
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            time.sleep(0.1)
+            try:
+                content = cmd_file.read_text().strip()
+                if not content or content == "{}":
+                    return {"ok": True}
+            except FileNotFoundError:
+                return {"ok": True}
+        logger.warning("DWX command timed out: %s", payload.get("_action"))
+        return {"ok": False, "detail": "timeout"}
+
+    # ── Interface ─────────────────────────────────────────────────────────────
+
+    def get_account_info(self) -> dict:
+        acct_file = self._f("DWX_Accounts.json")
+        if not acct_file.exists():
+            raise FileNotFoundError(
+                f"DWX_Accounts.json not found at {self._files}. "
+                "Is MT4 running with DWX Connect EA attached to a chart?"
+            )
+        data = json.loads(acct_file.read_text())
+        return {
+            "account_number": str(data.get("_login", "")),
+            "broker":         data.get("_broker", "MT4 / DWX Connect"),
+            "server":         data.get("_server", ""),
+            "currency":       data.get("_currency", "USD"),
+            "leverage":       data.get("_leverage", 0),
+            "balance":        float(data.get("_balance", 0)),
+            "equity":         float(data.get("_equity", 0)),
+            "margin":         float(data.get("_margin", 0)),
+            "free_margin":    float(data.get("_free_margin", 0)),
+            "margin_level":   data.get("_margin_level"),
+            "connected":      True,
+        }
+
+    def get_positions(self) -> list[dict]:
+        orders_file = self._f("DWX_Orders_All.json")
+        if not orders_file.exists():
+            return []
+        try:
+            data = json.loads(orders_file.read_text())
+        except Exception:
+            return []
+        result = []
+        for ticket, o in data.items():
+            result.append({
+                "ticket":        str(ticket),
+                "symbol":        o.get("_symbol", ""),
+                "direction":     "BUY" if o.get("_type", 1) == 0 else "SELL",
+                "lots":          float(o.get("_lots", 0)),
+                "open_price":    float(o.get("_open_price", 0)),
+                "current_price": float(o.get("_close_price", 0)),
+                "stop_loss":     o.get("_SL"),
+                "take_profit":   o.get("_TP"),
+                "pnl":           float(o.get("_pnl", 0)),
+                "open_time":     o.get("_open_time", ""),
+                "commission":    float(o.get("_commission", 0)),
+                "swap":          float(o.get("_swap", 0)),
+            })
+        return result
+
+    def place_order(self, symbol, direction, lots, entry, sl, tp,
+                    order_type="LIMIT") -> dict:
+        dir_upper = direction.upper()
+        if order_type == "LIMIT":
+            dwx_type = self._ORDER_TYPES.get(
+                "BUYLIMIT" if dir_upper in ("BUY", "LONG") else "SELLLIMIT", 2
+            )
+        else:
+            dwx_type = self._ORDER_TYPES.get(
+                "BUY" if dir_upper in ("BUY", "LONG") else "SELL", 0
+            )
+
+        return self._send_command({
+            "_action":  "OPEN",
+            "_type":    dwx_type,
+            "_symbol":  symbol,
+            "_price":   round(entry, 3),
+            "_SL":      round(sl, 3),
+            "_TP":      round(tp, 3),
+            "_lots":    round(lots, 2),
+            "_comment": "XAU_BOT",
+        })
+
+    def close_position(self, position_id: str, lots: Optional[float] = None) -> dict:
+        payload: dict = {"_action": "CLOSE", "_ticket": int(position_id)}
+        if lots:
+            payload["_lots"] = round(lots, 2)
+        return self._send_command(payload)
+
+    def test_connection(self) -> tuple[bool, str]:
+        if not self._files.exists():
+            return False, f"MT4 Files directory not found: {self._files}"
+        try:
+            info = self.get_account_info()
+            return True, (
+                f"{info['broker']} — {info['server']} — "
+                f"#{info['account_number']} — balance ${info['balance']:,.2f}"
+            )
+        except FileNotFoundError as exc:
+            return False, str(exc)
+        except Exception as exc:
+            return False, str(exc)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -311,7 +462,14 @@ def build_broker(cfg: dict) -> BrokerBase:
     broker_cfg = cfg.get("broker", {})
     btype      = broker_cfg.get("type", "paper").lower()
 
-    if btype == "metaapi":
+    if btype == "dwx":
+        dwx = broker_cfg.get("dwx", {})
+        files_path = dwx.get("mt4_files_path", "")
+        if not files_path:
+            raise ValueError("broker.dwx.mt4_files_path is required")
+        return DWXBroker(files_path, magic=int(dwx.get("magic", 88888)))
+
+    elif btype == "metaapi":
         ma = broker_cfg.get("metaapi", {})
         token      = ma.get("token", "")
         account_id = ma.get("account_id", "")

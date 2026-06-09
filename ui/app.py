@@ -1211,7 +1211,8 @@ def page_live_trading():
 
 _BROKER_TYPES = {
     "paper":    "📄  Paper Trading (simulation)",
-    "metaapi":  "🔗  MetaApi — MT5 / MT4 (any broker, Linux-compatible)",
+    "dwx":      "🍷  DWX Connect — MT4 under Wine (OpoFinance, any MT4 broker)",
+    "metaapi":  "🔗  MetaApi — MT5 / MT4 cloud bridge",
     "oanda":    "💱  OANDA — REST API (practice or live)",
 }
 _BROKER_KEYS = list(_BROKER_TYPES.keys())
@@ -1222,7 +1223,10 @@ def _broker_test(btype: str, token: str = "", account_id: str = "",
                  environment: str = "practice") -> tuple[bool, str]:
     """Attempt a live connection test without saving credentials."""
     try:
-        if btype == "metaapi":
+        if btype == "dwx":
+            from xau_bot.broker import DWXBroker
+            broker = DWXBroker(token)  # token field reused for mt4_files_path
+        elif btype == "metaapi":
             from xau_bot.broker import MetaApiBroker
             broker = MetaApiBroker(token, account_id)
         elif btype == "oanda":
@@ -1301,6 +1305,77 @@ def page_broker():
     )
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── DWX Connect settings ──────────────────────────────────────────────────
+    if new_type == "dwx":
+        st.markdown("""
+        <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:18px 20px; margin-bottom:16px;">
+            <div style="color:#f0c040; font-weight:700; margin-bottom:8px;">📋 DWX Connect Setup — MT4 under Wine</div>
+            <ol style="color:#8b949e; font-size:13px; line-height:2.2; margin:0; padding-left:18px;">
+                <li>Run <code style="color:#58a6ff;">bash scripts/install_mt4_wine.sh</code> on the VPS to install Wine + MT4</li>
+                <li>Download <strong>DWX_Server.ex4</strong> and copy it to MT4's <em>Experts</em> folder</li>
+                <li>In MT4: open any XAUUSD chart → <em>Insert → Experts → DWX_Server</em> → Enable AutoTrading</li>
+                <li>The path below is auto-detected — adjust if your MT4 is installed elsewhere</li>
+                <li>Click <strong>Test Connection</strong> — you should see your account balance</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+
+        dwx_cfg = bcfg.setdefault("dwx", {})
+        default_path = dwx_cfg.get(
+            "mt4_files_path",
+            "~/.wine-mt4/drive_c/Program Files (x86)/OpoFinance MT4 Terminal/MQL4/Files"
+        )
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            mt4_path = st.text_input("MT4 MQL4/Files path", value=default_path)
+        with c2:
+            magic = st.number_input("Magic number", value=int(dwx_cfg.get("magic", 88888)),
+                                    min_value=1, max_value=999999)
+
+        # Check if MT4 is actually running
+        files_dir = Path(mt4_path).expanduser()
+        acct_file = files_dir / "DWX_Accounts.json"
+        orders_file = files_dir / "DWX_Orders_All.json"
+        mt4_running = acct_file.exists()
+
+        if mt4_running:
+            st.markdown(badge("MT4 RUNNING", "green") + "  DWX files detected", unsafe_allow_html=True)
+        else:
+            st.markdown(badge("MT4 NOT DETECTED", "red") + "  Start MT4 and attach DWX_Server EA to a chart", unsafe_allow_html=True)
+
+        col_test, col_save, _ = st.columns([1, 1, 4])
+        with col_test:
+            if st.button("🔌  Test Connection", use_container_width=True):
+                with st.spinner("Reading DWX files…"):
+                    ok, msg = _broker_test("dwx", token=mt4_path)
+                if ok:
+                    st.success(f"✅  {msg}")
+                else:
+                    st.error(f"❌  {msg}")
+
+        with col_save:
+            if st.button("💾  Save", use_container_width=True):
+                dwx_cfg["mt4_files_path"] = mt4_path
+                dwx_cfg["magic"]          = int(magic)
+                bcfg["type"]              = "dwx"
+                cfg["broker"]             = bcfg
+                save_config(cfg)
+                st.success("Saved — restart the bot to apply")
+
+        with st.expander("📥  Download DWX_Server EA"):
+            st.markdown("""
+            Run this on the VPS to download the DWX Connect EA:
+            """)
+            st.code(
+                "# Download DWX_Server EA (.ex4 compiled)\n"
+                "wget -O ~/DWX_Server.ex4 \\\n"
+                "  https://github.com/darwinex/dwxconnect/raw/master/mql4/experts/DWX_Server.ex4\n\n"
+                "# Copy to MT4 Experts directory (adjust path if different)\n"
+                'MT4_DIR=~/.wine-mt4/drive_c/"Program Files (x86)"/"OpoFinance MT4 Terminal"\n'
+                'cp ~/DWX_Server.ex4 "$MT4_DIR/MQL4/Experts/"',
+                language="bash",
+            )
 
     # ── MetaApi settings ───────────────────────────────────────────────────────
     if new_type == "metaapi":

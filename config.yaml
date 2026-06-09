@@ -133,7 +133,13 @@ learning:
 
 # ── Broker Connection ────────────────────────────────────────
 broker:
-  type: "paper"               # "paper" | "metaapi" | "oanda"
+  type: "paper"               # "paper" | "dwx" | "metaapi" | "oanda"
+
+  # DWX Connect — MT4 running under Wine on this VPS
+  # Set mt4_files_path to your MT4 MQL4/Files directory
+  dwx:
+    mt4_files_path: "~/.wine-mt4/drive_c/Program Files (x86)/OpoFinance MT4 Terminal/MQL4/Files"
+    magic: 88888              # Magic number for bot orders
 
   # MetaApi cloud MT5/MT4 bridge — works from Linux VPS
   # Sign up free at https://metaapi.cloud, add your MT5 account,
