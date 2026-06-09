@@ -117,6 +117,10 @@ class DataHandler:
             candle_type=str(row["candle_type"]),
         )
 
+    def enrich(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Public wrapper: validate + enrich an arbitrary OHLC DataFrame."""
+        return self._enrich(self._validate(df))
+
     def slice(self, df: pd.DataFrame, start: str, end: str) -> pd.DataFrame:
         """Return a date-filtered slice."""
         return df.loc[start:end]

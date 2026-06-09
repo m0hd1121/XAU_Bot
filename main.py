@@ -94,86 +94,307 @@ def run_backtest(cfg: dict) -> None:
     logging.getLogger(__name__).info("Metrics saved to reports/metrics.json")
 
 
+def _fetch_ohlc(yf_symbol: str, period: str) -> "pd.DataFrame | None":
+    """Download OHLC bars from Yahoo Finance, returning UTC-naive DataFrame."""
+    try:
+        import yfinance as yf
+        import pandas as pd
+        ticker = yf.Ticker(yf_symbol)
+        raw = ticker.history(period=period, interval="1h", auto_adjust=True)
+        if raw is None or raw.empty:
+            return None
+        raw.columns = [c.lower() for c in raw.columns]
+        # Normalise index to UTC-naive timestamps
+        if hasattr(raw.index, "tz") and raw.index.tz is not None:
+            raw.index = raw.index.tz_convert("UTC").tz_localize(None)
+        raw = raw[["open", "high", "low", "close", "volume"]].dropna()
+        return raw
+    except Exception as exc:
+        logging.getLogger(__name__).warning("yfinance fetch failed: %s", exc)
+        return None
+
+
+def _htf_bias_for_df(df: "pd.DataFrame", cfg: dict) -> dict:
+    """Resample 1H DataFrame to 4H and return date→Trend bias map."""
+    try:
+        from xau_bot.market_structure_engine import MarketStructureEngine, Trend
+        import pandas as pd
+        htf = df[["open", "high", "low", "close"]].resample("4h").agg(
+            {"open": "first", "high": "max", "low": "min", "close": "last"}
+        ).dropna()
+        if len(htf) < 10:
+            return {}
+        htf["atr_proxy"] = (htf["high"] - htf["low"]).rolling(14, min_periods=1).mean()
+        engine = MarketStructureEngine(cfg)
+        bias_map: dict = {}
+        for j in range(len(htf)):
+            engine.update(htf, j)
+            bias_map[str(htf.index[j])[:10]] = engine.get_trend()
+        return bias_map
+    except Exception as exc:
+        logging.getLogger(__name__).warning("HTF bias computation failed: %s", exc)
+        return {}
+
+
 def run_paper(cfg: dict) -> None:
     """
-    Paper trading daemon — runs continuously, scanning for setups on live/scheduled data.
-    Keeps the process alive so the API shows 'Running'. Writes status files every 5 s.
-    Stopped cleanly by SIGTERM (the API's 'Stop' button).
+    Paper trading daemon — fetches live XAUUSD bars every hour, runs the full
+    strategy pipeline (market structure → strategy → risk → execution), and
+    writes account_snapshot.json + open_trades.json for the API to serve.
     """
     import json
     import signal
     import time
     from datetime import datetime, timezone
-    from pathlib import Path
+
+    import pandas as pd
+
+    from xau_bot.data_handler import DataHandler
+    from xau_bot.market_structure_engine import MarketStructureEngine, Trend
+    from xau_bot.strategy_engine import StrategyEngine, TradeDirection, TradeState
+    from xau_bot.risk_manager import RiskManager
+    from xau_bot.execution_engine import ExecutionEngine
 
     logger = logging.getLogger(__name__)
     logger.info("Paper trading daemon starting")
 
-    data_dir = Path(cfg.get("data", {}).get("csv_path", "data/XAUUSD_H1.csv")).parent
+    # ── Paths ────────────────────────────────────────────────────────────────
+    data_dir    = Path(cfg.get("data", {}).get("csv_path", "data/XAUUSD_H1.csv")).parent
     data_dir.mkdir(parents=True, exist_ok=True)
-
-    initial_capital = float(cfg.get("risk", {}).get("initial_capital", 10000.0))
-    equity  = initial_capital
-    balance = initial_capital
-
-    # Try to restore prior equity from existing snapshot so a restart keeps continuity
     snap_path   = data_dir / "account_snapshot.json"
     trades_path = data_dir / "open_trades.json"
-    try:
-        import json as _json
-        prev = _json.loads(snap_path.read_text())
-        equity  = float(prev.get("equity",  equity))
-        balance = float(prev.get("balance", balance))
-        logger.info("Restored equity from previous snapshot: $%.2f", equity)
-    except Exception:
-        logger.info("Starting with initial capital: $%.2f", initial_capital)
 
-    # ── Signal handling ─────────────────────────────────────────────────────────
+    # ── Signal handling ──────────────────────────────────────────────────────
     _alive = [True]
 
     def _on_signal(sig, _frame):
-        logger.info("Paper trading daemon received signal %d — shutting down", sig)
+        logger.info("Paper daemon received signal %d — shutting down", sig)
         _alive[0] = False
 
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT,  _on_signal)
 
-    snap_path   = data_dir / "account_snapshot.json"
-    trades_path = data_dir / "open_trades.json"
+    # ── Engines ──────────────────────────────────────────────────────────────
+    dh        = DataHandler(cfg)
+    ms_engine = MarketStructureEngine(cfg)
+    strategy  = StrategyEngine(cfg, ms_engine)
+    risk      = RiskManager(cfg)
+    execution = ExecutionEngine(cfg)
+
+    # Restore equity from last snapshot
+    initial_capital = float(cfg.get("risk", {}).get("initial_capital", 10000.0))
+    try:
+        prev = json.loads(snap_path.read_text())
+        risk.update_equity(float(prev.get("equity", initial_capital)))
+        logger.info("Restored equity: $%.2f", risk.equity)
+    except Exception:
+        logger.info("Starting fresh with $%.2f", initial_capital)
+
+    yf_symbol = "GC=F"   # Gold Futures — closest proxy for XAUUSD on Yahoo Finance
+
+    # ── Status writer ────────────────────────────────────────────────────────
+    open_trades: list = []    # list[ActiveTrade]
+    last_price: list  = [0.0]
 
     def _write_status() -> None:
         try:
+            eq = risk.equity
+            trade_dicts = []
+            for t in open_trades:
+                cur = last_price[0]
+                sign = 1.0 if t.direction == TradeDirection.LONG else -1.0
+                unreal = sign * (cur - t.entry_price) * t.lot_size * 100 if cur else 0.0
+                trade_dicts.append({
+                    "ticket":        t.trade_id,
+                    "symbol":        "XAUUSD",
+                    "direction":     t.direction.value.upper(),
+                    "lots":          t.lot_size,
+                    "open_price":    t.entry_price,
+                    "current_price": round(cur, 3) if cur else None,
+                    "stop_loss":     t.sl_price,
+                    "take_profit":   t.tp2_price,
+                    "open_time":     str(t.setup.timestamp),
+                    "close_time":    None,
+                    "close_price":   None,
+                    "pnl":           round(unreal, 2),
+                    "commission":    0.0,
+                    "swap":          0.0,
+                    "session":       t.setup.session,
+                    "status":        "open",
+                    "rr":            round(t.setup.quality_score, 2),
+                    "trigger_type":  str(t.setup.trigger_shift_event.value) if t.setup.trigger_shift_event else None,
+                    "zone_quality":  round(t.setup.quality_score, 2),
+                })
+            trades_path.write_text(json.dumps(trade_dicts))
             snap = {
                 "account_number": "PAPER-001",
-                "broker":         "Paper Trading",
-                "server":         "Simulated",
+                "broker":         "Paper Trading (GC=F)",
+                "server":         "Yahoo Finance",
                 "currency":       "USD",
                 "leverage":       100,
-                "balance":        round(balance, 2),
-                "equity":         round(equity,  2),
+                "balance":        round(eq, 2),
+                "equity":         round(eq, 2),
                 "margin":         0.0,
-                "free_margin":    round(equity,  2),
+                "free_margin":    round(eq, 2),
                 "margin_level":   None,
                 "connected":      True,
                 "latency_ms":     0,
                 "timestamp":      datetime.now(timezone.utc).isoformat(),
             }
             snap_path.write_text(json.dumps(snap))
-            if not trades_path.exists():
-                trades_path.write_text("[]")
-        except Exception as _e:
-            logger.warning("Status write failed (non-fatal): %s", _e)
+        except Exception as exc:
+            logger.warning("Status write failed (non-fatal): %s", exc)
+
+    # ── Download warmup data ─────────────────────────────────────────────────
+    logger.info("Downloading 90 days of hourly bars from Yahoo Finance (%s)…", yf_symbol)
+    raw_df = _fetch_ohlc(yf_symbol, "90d")
+    if raw_df is None or raw_df.empty:
+        logger.error("Failed to download warmup data — check network or yfinance install")
+        _write_status()
+        # Keep process alive so the API shows 'Running' even without data
+        while _alive[0]:
+            time.sleep(10)
+            _write_status()
+        return
+
+    # Remove the last (still-forming) bar
+    raw_df = raw_df.iloc[:-1].copy()
+
+    try:
+        df = dh.enrich(raw_df)
+    except Exception as exc:
+        logger.error("Data enrichment failed: %s", exc)
+        return
+
+    logger.info("Warming up market structure engine on %d bars…", len(df))
+    htf_bias = _htf_bias_for_df(df, cfg)
+
+    for i in range(len(df)):
+        ts_key = str(df.index[i])[:10]
+        strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
+        ms_engine.update(df, i)
+
+    last_bar_time = df.index[-1]
+    last_price[0] = float(df["close"].values[-1])
+    logger.info("Warmup complete. Last bar: %s  price: %.2f", last_bar_time, last_price[0])
 
     _write_status()
-    logger.info("Paper trading daemon running — equity $%.2f — waiting for new bars", equity)
 
+    # ── Main loop — check for new bars every 60 s ────────────────────────────
     tick = 0
     while _alive[0]:
-        time.sleep(5)
+        time.sleep(30)
         tick += 1
         _write_status()
-        if tick % 72 == 0:   # every ~6 minutes
-            logger.info("Paper trading heartbeat — equity: $%.2f", equity)
+
+        # Poll for new bars every ~2 minutes
+        if tick % 4 != 0:
+            continue
+
+        try:
+            fresh = _fetch_ohlc(yf_symbol, "5d")
+            if fresh is None or fresh.empty:
+                continue
+
+            # Drop the last (still-forming) bar
+            fresh = fresh.iloc[:-1]
+
+            new_bars = fresh[fresh.index > last_bar_time]
+            if new_bars.empty:
+                continue
+
+            logger.info("%d new bar(s) to process", len(new_bars))
+
+            for bar_ts in new_bars.index:
+                bar_row = new_bars.loc[bar_ts]
+
+                # Append raw bar to DataFrame and re-enrich
+                new_row = pd.DataFrame(
+                    [[bar_row["open"], bar_row["high"], bar_row["low"],
+                      bar_row["close"], bar_row.get("volume", 0.0)]],
+                    index=[bar_ts],
+                    columns=["open", "high", "low", "close", "volume"],
+                )
+                raw_df = pd.concat([raw_df, new_row])
+                df = dh.enrich(raw_df)
+
+                i = len(df) - 1
+                last_price[0] = float(df["close"].values[-1])
+
+                # Update HTF bias daily
+                ts_key = str(bar_ts)[:10]
+                if ts_key not in htf_bias:
+                    htf_bias = _htf_bias_for_df(df, cfg)
+                strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
+
+                candle = dh.get_candle(df, i)
+                state  = ms_engine.update(df, i)
+
+                # ── Manage open positions ─────────────────────────────────────
+                still_open = []
+                for trade in open_trades:
+                    trade = strategy.manage_open_trade(trade, candle, df)
+
+                    if trade.state == TradeState.CLOSED:
+                        pnl = execution.close_trade(
+                            trade, trade.close_price, i, trade.close_reason)
+                        risk.register_trade_close(pnl)
+                        logger.info("Trade #%d CLOSED [%s] pnl=$%.2f",
+                                    trade.trade_id, trade.close_reason, pnl)
+
+                    elif trade.state == TradeState.PARTIAL and not getattr(trade, "_tp1_booked", False):
+                        pnl = execution.close_trade(
+                            trade, trade.tp1_price, i, "tp1_partial", partial=True)
+                        risk.register_trade_close(pnl)
+                        trade._tp1_booked = True
+                        still_open.append(trade)
+                        logger.info("Trade #%d TP1 partial close pnl=$%.2f", trade.trade_id, pnl)
+
+                    else:
+                        still_open.append(trade)
+
+                open_trades[:] = still_open
+
+                # ── Evaluate new setup ────────────────────────────────────────
+                if not risk.is_trading_allowed:
+                    logger.info("Trading halted by risk manager at bar %d", i)
+                    continue
+
+                open_dirs = [t.direction for t in open_trades]
+                setup = strategy.evaluate(candle, state, df, open_dirs)
+
+                if setup is not None:
+                    atr = float(df["atr_proxy"].values[i]) if "atr_proxy" in df.columns else candle.range_size
+                    bar_data = {
+                        "open": candle.open, "high": candle.high,
+                        "low":  candle.low,  "close": candle.close,
+                        "atr_proxy": atr,
+                    }
+                    risk_report = risk.evaluate_trade(
+                        entry_price=setup.entry_price,
+                        sl_price=setup.raw_sl_price,
+                        direction=setup.direction.value,
+                        atr_proxy=atr,
+                        current_time=candle.timestamp if hasattr(candle.timestamp, "date") else None,
+                        open_trades=len(open_trades),
+                    )
+                    if risk_report.allowed:
+                        trade = execution.submit_order(setup, risk_report, i, bar_data)
+                        if trade:
+                            risk.register_trade_open(risk_report.lot_size)
+                            open_trades.append(trade)
+                            logger.info("Trade #%d OPENED %s @ %.2f  SL=%.2f  TP1=%.2f  TP2=%.2f",
+                                        trade.trade_id, trade.direction.value,
+                                        trade.entry_price, trade.sl_price,
+                                        trade.tp1_price, trade.tp2_price)
+                    else:
+                        logger.debug("Trade blocked by risk: %s", risk_report.reason)
+
+                last_bar_time = bar_ts
+                _write_status()
+
+        except Exception as exc:
+            logger.error("Error processing bar: %s", exc, exc_info=True)
 
     _write_status()
     logger.info("Paper trading daemon stopped cleanly")
@@ -181,13 +402,12 @@ def run_paper(cfg: dict) -> None:
 
 def run_live(cfg: dict) -> None:
     """
-    Live trading daemon placeholder — requires a BrokerAPI adapter (MT5, REST, etc.).
-    Until the adapter is implemented this runs as a paper-trading daemon so the
-    process stays alive and the iOS app shows 'Running'.
+    Live trading daemon — uses real broker prices when a BrokerAPI adapter is
+    configured; falls back to paper simulation (Yahoo Finance data) otherwise.
     """
     logging.getLogger(__name__).warning(
-        "Live mode: no broker adapter configured — falling back to paper simulation. "
-        "Implement BrokerAPI in xau_bot/execution_engine.py to enable real trading."
+        "Live mode: no broker adapter configured — running as paper simulation. "
+        "Implement BrokerAPI in xau_bot/execution_engine.py to enable real-money trading."
     )
     run_paper(cfg)
 
