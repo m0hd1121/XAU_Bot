@@ -158,6 +158,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 # ── Routers ───────────────────────────────────────────────────────────────────
 
 from app.routers import (
+    account,
     auth,
     analytics,
     backup,
@@ -175,6 +176,7 @@ from app.websocket.manager import ws_router
 API_PREFIX = "/api/v1"
 
 app.include_router(auth.router,         prefix=f"{API_PREFIX}/auth",          tags=["Authentication"])
+app.include_router(account.router,      prefix=f"{API_PREFIX}/account",       tags=["Account"])
 app.include_router(dashboard.router,    prefix=f"{API_PREFIX}/dashboard",      tags=["Dashboard"])
 app.include_router(bot_control.router,  prefix=f"{API_PREFIX}/bot",            tags=["Bot Control"])
 app.include_router(trades.router,       prefix=f"{API_PREFIX}/trades",         tags=["Trades"])
