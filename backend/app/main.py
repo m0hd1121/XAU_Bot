@@ -183,7 +183,7 @@ app.include_router(analytics.router,    prefix=f"{API_PREFIX}/analytics",      t
 app.include_router(learning.router,     prefix=f"{API_PREFIX}/learning",       tags=["Learning Engine"])
 app.include_router(vps.router,          prefix=f"{API_PREFIX}/vps",            tags=["VPS"])
 app.include_router(logs.router,         prefix=f"{API_PREFIX}/logs",           tags=["Logs"])
-app.include_router(backup.router,       prefix=f"{API_PREFIX}/backup",         tags=["Backup"])
+app.include_router(backup.router,       prefix=f"{API_PREFIX}/backups",        tags=["Backup"])
 app.include_router(notifications.router,prefix=f"{API_PREFIX}/notifications",  tags=["Notifications"])
 app.include_router(ws_router,           prefix=f"{API_PREFIX}/ws",             tags=["WebSocket"])
 

@@ -82,18 +82,59 @@ def _safe_name(name: str) -> str:
 @router.get("", summary="List all backup archives")
 async def list_backups(_user=Depends(require_admin)) -> dict:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Try to get full records from DB first
+    try:
+        from app.database import db_session
+        from app.models.models import BackupRecord as BackupRecordModel
+        async with db_session() as db:
+            result = await db.execute(
+                select(BackupRecordModel).order_by(BackupRecordModel.created_at.desc())
+            )
+            rows = result.scalars().all()
+            backups = [
+                {
+                    "id":              r.id,
+                    "filename":        r.filename,
+                    "size_bytes":      r.size_bytes,
+                    "includes_db":     r.includes_db,
+                    "includes_config": r.includes_config,
+                    "includes_logs":   r.includes_logs,
+                    "created_by":      r.created_by,
+                    "notes":           r.notes,
+                    "checksum_sha256": r.checksum_sha256,
+                    "restored_at":     r.restored_at.isoformat() if r.restored_at else None,
+                    "created_at":      r.created_at.isoformat(),
+                }
+                for r in rows
+                if (BACKUP_DIR / r.filename).exists()
+            ]
+            return {"backups": backups, "total": len(backups)}
+    except Exception as exc:
+        logger.warning("Could not query backup DB, falling back to filesystem: %s", exc)
+
+    # Filesystem fallback (no id — iOS will fail to decode, but avoids 500)
     backups = []
-    for f in sorted(BACKUP_DIR.glob("*.tar.gz"), reverse=True):
+    for i, f in enumerate(sorted(BACKUP_DIR.glob("*.tar.gz"), reverse=True), start=1):
         backups.append({
-            "filename": f.name,
-            "size_bytes": f.stat().st_size,
-            "created_at": datetime.fromtimestamp(
-                f.stat().st_ctime, tz=timezone.utc
-            ).isoformat(),
+            "id":              i,
+            "filename":        f.name,
+            "size_bytes":      f.stat().st_size,
+            "includes_db":     True,
+            "includes_config": True,
+            "includes_logs":   False,
+            "created_by":      None,
+            "notes":           None,
+            "checksum_sha256": None,
+            "restored_at":     None,
+            "created_at":      datetime.fromtimestamp(
+                                   f.stat().st_ctime, tz=timezone.utc
+                               ).isoformat(),
         })
-    return {"backups": backups, "count": len(backups)}
+    return {"backups": backups, "total": len(backups)}
 
 
+@router.post("", summary="Create a new backup archive (iOS)")
 @router.post("/create", summary="Create a new backup archive")
 async def create_backup(
     req: BackupCreateRequest,
@@ -286,8 +327,9 @@ async def restore_backup(
     }
 
 
+@router.get("/export/trades/{format}", summary="Export trade history (CSV or JSON)")
 @router.get("/export/trades", summary="Export full trade history as CSV")
-async def export_trades(_user=Depends(require_admin)) -> StreamingResponse:
+async def export_trades(format: str = "csv", _user=Depends(require_admin)) -> StreamingResponse:
     trades = bot_service.get_trade_history(limit=100_000)
     buf = io.StringIO()
     if trades:
