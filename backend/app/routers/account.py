@@ -79,15 +79,41 @@ def _snap_to_ios(snap: dict) -> dict:
 async def account_current(_user=Depends(get_current_user)) -> dict:
     """
     Returns the latest account snapshot written by the bot.
-    Returns 404 if the bot hasn't connected to MT5 yet.
+    If the bot isn't connected yet, returns saved credentials with connected=false.
+    Returns 404 only if no account has ever been configured.
     """
     snap = _read_snapshot()
-    if snap is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account snapshot available — bot not connected to MT5",
-        )
-    return _snap_to_ios(snap)
+    if snap is not None:
+        return _snap_to_ios(snap)
+
+    # No live snapshot — check if any credentials are saved
+    active_path = BOT_ROOT / "data" / "active_account.json"
+    if active_path.exists():
+        try:
+            creds = json.loads(active_path.read_text())
+            login  = str(creds.get("login", "—"))
+            server = str(creds.get("server", "—"))
+            return {
+                "account_number": login,
+                "broker":         "MT5",
+                "server":         server,
+                "currency":       "USD",
+                "leverage":       100,
+                "balance":        0.0,
+                "equity":         0.0,
+                "margin":         0.0,
+                "free_margin":    0.0,
+                "margin_level":   None,
+                "connected":      False,
+                "latency_ms":     None,
+            }
+        except Exception:
+            pass
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No account configured — use POST /account/add to add credentials",
+    )
 
 
 @router.get("/list", summary="List saved broker account IDs")
