@@ -444,6 +444,29 @@ class BotService:
     def count_trades(self) -> int:
         return _query_one("SELECT COUNT(*) FROM trades") or 0
 
+    def count_trades_filtered(
+        self,
+        outcome: Optional[str] = None,
+        session: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> int:
+        sql = "SELECT COUNT(*) FROM trades WHERE 1=1"
+        args: list[Any] = []
+        if outcome:
+            sql += " AND outcome = ?"
+            args.append(outcome.upper())
+        if session:
+            sql += " AND session = ?"
+            args.append(session)
+        if start_date:
+            sql += " AND date(open_time) >= ?"
+            args.append(start_date)
+        if end_date:
+            sql += " AND date(open_time) <= ?"
+            args.append(end_date)
+        return _query_one(sql, tuple(args)) or 0
+
     def get_performance_metrics(self) -> dict:
         """Compute trading performance metrics from the learning DB."""
         conn = _db_conn()
