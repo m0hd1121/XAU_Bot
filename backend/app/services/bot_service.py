@@ -105,6 +105,53 @@ def _write_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, default=str))
 
 
+def _default_config() -> dict:
+    return {
+        "risk": {
+            "risk_per_trade": 1.0,
+            "max_risk_per_trade": 2.0,
+            "daily_drawdown_limit": 5.0,
+            "max_open_trades": 3,
+            "max_daily_loss": 100.0,
+        },
+        "strategy": {
+            "min_confidence": 0.6,
+            "min_zone_quality": 0.5,
+            "require_sweep": False,
+            "timeframe_primary": "H1",
+            "symbols": ["XAUUSD"],
+        },
+        "psychology": {
+            "max_consecutive_losses": 3,
+            "cooldown_minutes": 60,
+            "break_even_after_r": 1.0,
+            "trailing_stop_enabled": True,
+            "max_daily_trades": 5,
+        },
+        "learning": {
+            "enabled": True,
+            "min_samples": 30,
+            "retrain_interval": 24,
+            "validation_folds": 5,
+            "min_win_rate_threshold": 0.5,
+        },
+        "sessions": {
+            "london": True,
+            "new_york": True,
+            "tokyo": False,
+            "sydney": False,
+            "overlap": True,
+        },
+        "execution": {
+            "slippage_pips": 1.0,
+            "max_spread_pips": 3.0,
+            "magic_number": 20240101,
+            "comment": "XAUBot",
+            "use_market_orders": True,
+        },
+    }
+
+
 # ── BotService ────────────────────────────────────────────────────────────────
 
 class BotService:
@@ -279,13 +326,18 @@ class BotService:
 
     def read_config(self) -> dict:
         if not CONFIG_PATH.exists():
-            return {}
+            return _default_config()
         try:
             with open(CONFIG_PATH) as f:
-                return yaml.safe_load(f) or {}
+                cfg = yaml.safe_load(f) or {}
+            # Merge with defaults so missing keys don't break the iOS app
+            defaults = _default_config()
+            for section, values in defaults.items():
+                cfg.setdefault(section, values)
+            return cfg
         except Exception as exc:
             logger.error("Failed to read config: %s", exc)
-            return {}
+            return _default_config()
 
     def write_config(self, config: dict) -> None:
         CONFIG_PATH.write_text(
