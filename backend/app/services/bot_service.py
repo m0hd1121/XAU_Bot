@@ -152,6 +152,49 @@ def _default_config() -> dict:
     }
 
 
+# ── Trade / session helpers ───────────────────────────────────────────────────
+
+def _normalize_trade(t: dict) -> dict:
+    """Reformat a raw open-trade dict to match iOS TradeRecord CodingKeys."""
+    return {
+        "ticket":         int(t.get("ticket", t.get("trade_id", 0))),
+        "symbol":         str(t.get("symbol", "XAUUSD")),
+        "direction":      str(t.get("direction", t.get("type", "BUY"))).upper(),
+        "lots":           float(t.get("lots", t.get("volume", 0.0))),
+        "open_price":     float(t.get("open_price", t.get("price_open", 0.0))),
+        "current_price":  t.get("current_price"),
+        "stop_loss":      t.get("stop_loss", t.get("sl")),
+        "take_profit":    t.get("take_profit", t.get("tp")),
+        "open_time":      str(t.get("open_time", "")),
+        "close_time":     t.get("close_time"),
+        "close_price":    t.get("close_price"),
+        "pnl":            float(t.get("pnl", t.get("profit", 0.0))),
+        "pips":           t.get("pips"),
+        "commission":     float(t.get("commission", 0.0)),
+        "swap":           float(t.get("swap", 0.0)),
+        "session":        t.get("session"),
+        "regime":         t.get("regime"),
+        "confidence":     t.get("confidence"),
+        "trigger_type":   t.get("trigger_type"),
+        "sweep_detected": t.get("sweep_detected"),
+        "zone_quality":   t.get("zone_quality"),
+        "rr":             t.get("rr"),
+        "status":         str(t.get("status", "open")),
+        "ai_explanation": t.get("ai_explanation"),
+    }
+
+
+def _compute_session_quality(connected: bool, running: bool) -> str:
+    if not connected or not running:
+        return "poor"
+    utc_hour = datetime.now(tz=timezone.utc).hour
+    if 13 <= utc_hour < 17:
+        return "excellent"
+    if 8 <= utc_hour < 21:
+        return "good"
+    return "fair"
+
+
 # ── BotService ────────────────────────────────────────────────────────────────
 
 class BotService:
@@ -632,53 +675,73 @@ class BotService:
 
     async def get_dashboard_snapshot(self) -> dict:
         """
-        Build the full dashboard payload.
+        Build the full dashboard payload in iOS DashboardSnapshot format.
         Called by the REST dashboard endpoint and the WebSocket worker.
         """
-        from app.routers.dashboard import AccountSnapshot
-
-        bot_status = await self.get_bot_status()
-        account    = self.get_account_snapshot()
-        metrics    = self.get_performance_metrics()
+        bot_status  = await self.get_bot_status()
+        account     = self.get_account_snapshot()
+        metrics     = self.get_performance_metrics()
         open_trades = self.get_open_trades()
-        learning   = self.get_learning_stats()
+
+        # Fallback to active_account.json for display when no live MT5 snapshot
+        if not account:
+            active_path = BOT_ROOT / "data" / "active_account.json"
+            if active_path.exists():
+                try:
+                    creds   = json.loads(active_path.read_text())
+                    account = {
+                        "account_number": str(creds.get("login", "—")),
+                        "server":         str(creds.get("server", "—")),
+                        "connected":      False,
+                    }
+                except Exception:
+                    pass
 
         initial_capital = self.read_config().get("risk", {}).get("initial_capital", 10000.0)
-        balance  = account.get("balance", initial_capital)
-        equity   = account.get("equity", balance)
+        balance   = float(account.get("balance",  initial_capital))
+        equity    = float(account.get("equity",   balance))
+        connected = bool(account.get("connected", False))
+        running   = bot_status["running"]
+        now       = datetime.now(tz=timezone.utc).isoformat()
 
-        return AccountSnapshot(
-            balance=round(balance, 2),
-            equity=round(equity, 2),
-            margin_used=round(account.get("used_margin", 0.0), 2),
-            margin_free=round(account.get("free_margin", equity), 2),
-            margin_level_pct=account.get("margin_level"),
-            daily_pnl=metrics.get("daily_pnl", 0.0),
-            daily_pnl_pct=metrics.get("daily_pnl_pct", 0.0),
-            weekly_pnl=metrics.get("weekly_pnl", 0.0),
-            weekly_pnl_pct=metrics.get("weekly_pnl_pct", 0.0),
-            monthly_pnl=metrics.get("monthly_pnl", 0.0),
-            monthly_pnl_pct=metrics.get("monthly_pnl_pct", 0.0),
-            total_pnl=metrics.get("total_pnl", 0.0),
-            open_trades_count=len(open_trades),
-            pending_orders_count=0,
-            total_trades_all_time=metrics.get("total_trades", 0),
-            win_rate_recent=metrics.get("win_rate_recent_50"),
-            bot_running=bot_status["running"],
-            bot_paused=bot_status["paused"],
-            bot_mode=bot_status["mode"],
-            bot_pid=bot_status["pid"],
-            bot_uptime_seconds=bot_status["uptime_seconds"],
-            emergency_stopped=bot_status["emergency_stopped"],
-            maintenance_mode=bot_status["maintenance_mode"],
-            learning_enabled=bot_status["learning_enabled"],
-            learning_trade_count=learning.get("trade_count", 0),
-            learning_last_analysis=learning.get("last_analysis_time"),
-            broker_connected=account.get("connected", False),
-            last_heartbeat=None,
-            last_trade_time=None,
-            last_sync_time=datetime.now(tz=timezone.utc),
-        )
+        return {
+            "bot_status": {
+                "running":           running,
+                "paused":            bot_status["paused"],
+                "maintenance_mode":  bot_status["maintenance_mode"],
+                "emergency_stopped": bot_status["emergency_stopped"],
+                "learning_enabled":  bot_status["learning_enabled"],
+                "pid":               bot_status["pid"],
+                "mode":              bot_status["mode"],
+                "last_heartbeat":    None,
+                "last_trade_at":     None,
+                "open_trades_count": len(open_trades),
+                "daily_pnl":         float(metrics.get("daily_pnl",  0.0)),
+                "equity":            round(equity, 2),
+                "updated_at":        now,
+            },
+            "account_info": {
+                "account_number": str(account.get("account_number", account.get("login", "—"))),
+                "broker":         str(account.get("broker", account.get("company", "Unknown"))),
+                "server":         str(account.get("server", "—")),
+                "currency":       str(account.get("currency", "USD")),
+                "leverage":       int(account.get("leverage", 100)),
+                "balance":        round(balance, 2),
+                "equity":         round(equity, 2),
+                "margin":         round(float(account.get("margin",      account.get("used_margin",  0.0))), 2),
+                "free_margin":    round(float(account.get("free_margin", account.get("margin_free", equity))), 2),
+                "margin_level":   account.get("margin_level"),
+                "connected":      connected,
+                "latency_ms":     account.get("latency_ms"),
+            },
+            "open_trades":    [_normalize_trade(t) for t in open_trades],
+            "daily_pnl":      float(metrics.get("daily_pnl",   0.0)),
+            "weekly_pnl":     float(metrics.get("weekly_pnl",  0.0)),
+            "monthly_pnl":    float(metrics.get("monthly_pnl", 0.0)),
+            "unrealized_pnl": round(sum(float(t.get("pnl", 0.0)) for t in open_trades), 2),
+            "session_quality": _compute_session_quality(connected, running),
+            "timestamp":      now,
+        }
 
 
 # Singleton instance

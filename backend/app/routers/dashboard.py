@@ -129,10 +129,10 @@ async def get_bot_status(
     }
 
 
-@router.get("/snapshot", response_model=AccountSnapshot, summary="Full dashboard snapshot")
+@router.get("/snapshot", summary="Full dashboard snapshot")
 async def get_dashboard_snapshot(
     _current_user=Depends(get_current_user),
-) -> AccountSnapshot:
+) -> dict:
     """
     Returns a comprehensive snapshot of the bot's current state.
     Safe to poll at high frequency; bot_service reads from cached files.

@@ -43,7 +43,7 @@ def _make_message(msg_type: str, data: Any) -> str:
         {
             "type": msg_type,
             "ts": datetime.now(tz=timezone.utc).isoformat(),
-            "data": data,
+            "payload": data,
         },
         default=str,
     )
@@ -164,7 +164,7 @@ class WebSocketManager:
             try:
                 if self._clients:
                     snapshot = await bot_service.get_dashboard_snapshot()
-                    msg = _make_message("dashboard", snapshot.model_dump())
+                    msg = _make_message("dashboard", snapshot)
                     await self.broadcast(msg)
             except Exception as exc:
                 logger.debug("Dashboard broadcast error: %s", exc)
@@ -258,7 +258,7 @@ async def dashboard_feed(websocket: WebSocket) -> None:
         from app.services.bot_service import bot_service
         try:
             snapshot = await asyncio.wait_for(bot_service.get_dashboard_snapshot(), timeout=5)
-            await client.send(_make_message("dashboard", snapshot.model_dump()))
+            await client.send(_make_message("dashboard", snapshot))
         except Exception:
             pass
 
@@ -312,7 +312,7 @@ async def live_feed(websocket: WebSocket) -> None:
         # Push an immediate snapshot on connect
         from app.services.bot_service import bot_service
         snapshot = await bot_service.get_dashboard_snapshot()
-        await client.send(_make_message("dashboard", snapshot.model_dump()))
+        await client.send(_make_message("dashboard", snapshot))
 
         # Message pump
         while True:
