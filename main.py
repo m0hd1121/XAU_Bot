@@ -402,14 +402,240 @@ def run_paper(cfg: dict) -> None:
 
 def run_live(cfg: dict) -> None:
     """
-    Live trading daemon — uses real broker prices when a BrokerAPI adapter is
-    configured; falls back to paper simulation (Yahoo Finance data) otherwise.
+    Live trading daemon.
+
+    Uses the broker adapter configured under cfg['broker']['type']:
+      - 'paper'    → pure simulation (same as run_paper)
+      - 'metaapi'  → real MT5/MT4 orders via MetaApi cloud
+      - 'oanda'    → real orders via OANDA v20 REST API
+
+    Price feed stays Yahoo Finance (1H GC=F) for strategy decisions;
+    the broker adapter is used only for account queries and order placement.
     """
-    logging.getLogger(__name__).warning(
-        "Live mode: no broker adapter configured — running as paper simulation. "
-        "Implement BrokerAPI in xau_bot/execution_engine.py to enable real-money trading."
-    )
-    run_paper(cfg)
+    logger = logging.getLogger(__name__)
+    broker_type = cfg.get("broker", {}).get("type", "paper")
+
+    if broker_type == "paper":
+        logger.info("Live mode: broker=paper — running as paper simulation")
+        run_paper(cfg)
+        return
+
+    # Build broker adapter
+    try:
+        from xau_bot.broker import build_broker
+        broker = build_broker(cfg)
+        ok, msg = broker.test_connection()
+        if not ok:
+            logger.error("Broker connection failed: %s — falling back to paper mode", msg)
+            run_paper(cfg)
+            return
+        logger.info("Broker connected: %s", msg)
+    except Exception as exc:
+        logger.error("Failed to build broker adapter: %s — falling back to paper", exc)
+        run_paper(cfg)
+        return
+
+    # Run the standard paper loop but with the real broker for account info
+    # and order submission.  The execution_engine submit_order is called
+    # normally; after it returns we forward the order to the live broker.
+    import json
+    import signal
+    import time
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    import pandas as pd
+
+    from xau_bot.data_handler import DataHandler
+    from xau_bot.market_structure_engine import MarketStructureEngine, Trend
+    from xau_bot.strategy_engine import StrategyEngine, TradeDirection, TradeState
+    from xau_bot.risk_manager import RiskManager
+    from xau_bot.execution_engine import ExecutionEngine
+
+    data_dir    = Path(cfg.get("data", {}).get("csv_path", "data/XAUUSD_H1.csv")).parent
+    data_dir.mkdir(parents=True, exist_ok=True)
+    snap_path   = data_dir / "account_snapshot.json"
+    trades_path = data_dir / "open_trades.json"
+
+    _alive = [True]
+
+    def _on_signal(sig, _frame):
+        logger.info("Live daemon received signal %d — shutting down", sig)
+        _alive[0] = False
+
+    signal.signal(signal.SIGTERM, _on_signal)
+    signal.signal(signal.SIGINT, _on_signal)
+
+    dh        = DataHandler(cfg)
+    ms_engine = MarketStructureEngine(cfg)
+    strategy  = StrategyEngine(cfg, ms_engine)
+    risk      = RiskManager(cfg)
+    execution = ExecutionEngine(cfg)
+
+    # Sync equity from broker
+    try:
+        acct_info = broker.get_account_info()
+        risk.update_equity(float(acct_info.get("equity", cfg["risk"]["initial_capital"])))
+        logger.info("Broker equity synced: $%.2f", risk.equity)
+    except Exception as exc:
+        logger.warning("Could not sync equity from broker: %s", exc)
+
+    yf_symbol = "GC=F"
+    open_trades: list = []
+    last_price: list  = [0.0]
+    broker_orders: dict = {}  # trade_id → broker order_id
+
+    def _write_status():
+        try:
+            # Refresh account info from broker
+            try:
+                live_info = broker.get_account_info()
+                live_info["timestamp"] = datetime.now(timezone.utc).isoformat()
+                snap_path.write_text(json.dumps(live_info))
+            except Exception:
+                pass
+
+            # Sync positions from broker
+            try:
+                live_positions = broker.get_positions()
+                trades_path.write_text(json.dumps(live_positions))
+            except Exception:
+                pass
+        except Exception as exc:
+            logger.warning("Status write failed: %s", exc)
+
+    logger.info("Downloading warmup data…")
+    raw_df = _fetch_ohlc(yf_symbol, "90d")
+    if raw_df is None or raw_df.empty:
+        logger.error("Failed to download warmup data")
+        while _alive[0]:
+            time.sleep(30)
+            _write_status()
+        return
+
+    raw_df = raw_df.iloc[:-1].copy()
+    df     = dh.enrich(raw_df)
+    htf_bias = _htf_bias_for_df(df, cfg)
+
+    for i in range(len(df)):
+        ts_key = str(df.index[i])[:10]
+        strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
+        ms_engine.update(df, i)
+
+    last_bar_time  = df.index[-1]
+    last_price[0]  = float(df["close"].values[-1])
+    logger.info("Warmup complete. Last bar: %s  price: %.2f", last_bar_time, last_price[0])
+    _write_status()
+
+    tick = 0
+    while _alive[0]:
+        time.sleep(30)
+        tick += 1
+        _write_status()
+
+        if tick % 4 != 0:
+            continue
+
+        try:
+            fresh = _fetch_ohlc(yf_symbol, "5d")
+            if fresh is None or fresh.empty:
+                continue
+
+            fresh    = fresh.iloc[:-1]
+            new_bars = fresh[fresh.index > last_bar_time]
+            if new_bars.empty:
+                continue
+
+            for bar_ts in new_bars.index:
+                bar_row = new_bars.loc[bar_ts]
+                new_row = pd.DataFrame(
+                    [[bar_row["open"], bar_row["high"], bar_row["low"],
+                      bar_row["close"], bar_row.get("volume", 0.0)]],
+                    index=[bar_ts],
+                    columns=["open", "high", "low", "close", "volume"],
+                )
+                raw_df = pd.concat([raw_df, new_row])
+                df     = dh.enrich(raw_df)
+                i      = len(df) - 1
+                last_price[0] = float(df["close"].values[-1])
+
+                ts_key = str(bar_ts)[:10]
+                if ts_key not in htf_bias:
+                    htf_bias = _htf_bias_for_df(df, cfg)
+                strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
+
+                candle = dh.get_candle(df, i)
+                state  = ms_engine.update(df, i)
+
+                still_open = []
+                for trade in open_trades:
+                    trade = strategy.manage_open_trade(trade, candle, df)
+                    if trade.state == TradeState.CLOSED:
+                        pnl = execution.close_trade(trade, trade.close_price, i, trade.close_reason)
+                        risk.register_trade_close(pnl)
+                        # Close on broker
+                        oid = broker_orders.get(trade.trade_id)
+                        if oid:
+                            try:
+                                broker.close_position(oid)
+                                logger.info("Broker position %s closed", oid)
+                            except Exception as exc:
+                                logger.error("Failed to close broker position %s: %s", oid, exc)
+                    elif trade.state == TradeState.PARTIAL and not getattr(trade, "_tp1_booked", False):
+                        pnl = execution.close_trade(trade, trade.tp1_price, i, "tp1_partial", partial=True)
+                        risk.register_trade_close(pnl)
+                        trade._tp1_booked = True
+                        still_open.append(trade)
+                    else:
+                        still_open.append(trade)
+                open_trades[:] = still_open
+
+                if not risk.is_trading_allowed:
+                    continue
+
+                open_dirs = [t.direction for t in open_trades]
+                setup     = strategy.evaluate(candle, state, df, open_dirs)
+
+                if setup is not None:
+                    atr = float(df["atr_proxy"].values[i]) if "atr_proxy" in df.columns else candle.range_size
+                    bar_data = {"open": candle.open, "high": candle.high,
+                                "low": candle.low, "close": candle.close, "atr_proxy": atr}
+                    risk_report = risk.evaluate_trade(
+                        entry_price=setup.entry_price, sl_price=setup.raw_sl_price,
+                        direction=setup.direction.value, atr_proxy=atr,
+                        current_time=candle.timestamp if hasattr(candle.timestamp, "date") else None,
+                        open_trades=len(open_trades),
+                    )
+                    if risk_report.allowed:
+                        trade = execution.submit_order(setup, risk_report, i, bar_data)
+                        if trade:
+                            risk.register_trade_open(risk_report.lot_size)
+                            # Submit to live broker
+                            symbol = cfg.get("bot", {}).get("symbol", "XAUUSD")
+                            try:
+                                order_result = broker.place_order(
+                                    symbol    = symbol,
+                                    direction = trade.direction.value.upper(),
+                                    lots      = trade.lot_size,
+                                    entry     = trade.entry_price,
+                                    sl        = trade.sl_price,
+                                    tp        = trade.tp2_price,
+                                    order_type = cfg.get("strategy", {}).get("entry_type", "LIMIT").upper(),
+                                )
+                                broker_orders[trade.trade_id] = order_result.get("order_id", "")
+                                logger.info("Broker order placed: %s", order_result)
+                            except Exception as exc:
+                                logger.error("Failed to place broker order: %s", exc)
+                            open_trades.append(trade)
+
+                last_bar_time = bar_ts
+                _write_status()
+
+        except Exception as exc:
+            logger.error("Error processing bar: %s", exc, exc_info=True)
+
+    _write_status()
+    logger.info("Live trading daemon stopped")
 
 
 def main() -> None:

@@ -131,6 +131,23 @@ learning:
     max_overfit_score: 0.50        # Reject if OOS degrades more than 50%
     min_oos_ratio: 0.40            # OOS expectancy must be ≥40% of IS
 
+# ── Broker Connection ────────────────────────────────────────
+broker:
+  type: "paper"               # "paper" | "metaapi" | "oanda"
+
+  # MetaApi cloud MT5/MT4 bridge — works from Linux VPS
+  # Sign up free at https://metaapi.cloud, add your MT5 account,
+  # then paste the Token and Account ID below.
+  metaapi:
+    token: ""
+    account_id: ""
+
+  # OANDA REST API
+  oanda:
+    api_key: ""
+    account_id: ""
+    environment: "practice"   # "practice" | "live"
+
 # ── Logging ──────────────────────────────────────────────────
 logging:
   level: "INFO"                    # DEBUG | INFO | WARNING | ERROR

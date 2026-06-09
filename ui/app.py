@@ -288,7 +288,7 @@ def render_sidebar() -> str:
         st.markdown('<div class="section-header">Navigation</div>', unsafe_allow_html=True)
         page = st.radio(
             "",
-            ["🤖  Bot Control", "📈  Live Trading",
+            ["🤖  Bot Control", "📈  Live Trading", "🔌  Broker",
              "📊  Backtest Results", "🔬  Backtest", "⚙️  Configuration", "📋  Trade Log"],
             label_visibility="collapsed",
         )
@@ -1206,6 +1206,224 @@ def page_live_trading():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Page: Broker Connection
+# ─────────────────────────────────────────────────────────────────────────────
+
+_BROKER_TYPES = {
+    "paper":    "📄  Paper Trading (simulation)",
+    "metaapi":  "🔗  MetaApi — MT5 / MT4 (any broker, Linux-compatible)",
+    "oanda":    "💱  OANDA — REST API (practice or live)",
+}
+_BROKER_KEYS = list(_BROKER_TYPES.keys())
+
+
+def _broker_test(btype: str, token: str = "", account_id: str = "",
+                 api_key: str = "", oanda_account: str = "",
+                 environment: str = "practice") -> tuple[bool, str]:
+    """Attempt a live connection test without saving credentials."""
+    try:
+        if btype == "metaapi":
+            from xau_bot.broker import MetaApiBroker
+            broker = MetaApiBroker(token, account_id)
+        elif btype == "oanda":
+            from xau_bot.broker import OANDABroker
+            broker = OANDABroker(api_key, oanda_account, environment)
+        else:
+            from xau_bot.broker import PaperBroker
+            data_dir = ROOT / "data"
+            broker = PaperBroker(data_dir / "account_snapshot.json",
+                                 data_dir / "open_trades.json")
+        return broker.test_connection()
+    except ImportError as exc:
+        return False, f"Package not installed: {exc}. Run: pip install metaapi-cloud-sdk"
+    except Exception as exc:
+        return False, str(exc)
+
+
+def page_broker():
+    st.markdown('<h2 style="color:#e6edf3; margin-bottom:4px;">Broker Connection</h2>',
+                unsafe_allow_html=True)
+    st.markdown(
+        '<div style="color:#8b949e; font-size:13px; margin-bottom:20px;">'
+        'Connect to your demo or live trading account</div>',
+        unsafe_allow_html=True,
+    )
+
+    cfg  = deepcopy(load_config())
+    bcfg = cfg.setdefault("broker", {})
+
+    cur_type = bcfg.get("type", "paper")
+    if cur_type not in _BROKER_KEYS:
+        cur_type = "paper"
+
+    # ── Current status card ────────────────────────────────────────────────────
+    snap = _read_snapshot()
+    is_paper = cur_type == "paper"
+    connected = snap.get("connected", False) or is_paper
+    broker_label = snap.get("broker", "Paper Trading" if is_paper else "—")
+    ts = snap.get("timestamp", "")[:19].replace("T", " ")
+
+    status_style = "badge-green" if connected else "badge-red"
+    status_text  = "CONNECTED"   if connected else "DISCONNECTED"
+
+    st.markdown(f"""
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:10px;
+                padding:16px 20px; margin-bottom:20px; display:flex; align-items:center; gap:14px;">
+        <span class="badge {status_style}">{status_text}</span>
+        <div>
+            <div style="color:#e6edf3; font-size:14px; font-weight:600;">{broker_label}</div>
+            {'<div style="color:#8b949e; font-size:11px;">Last update: ' + ts + ' UTC</div>' if ts else ''}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if snap:
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.markdown(metric_card("Balance",  f"${snap.get('balance', 0):,.2f}"), unsafe_allow_html=True)
+        with c2:
+            st.markdown(metric_card("Equity",   f"${snap.get('equity',  0):,.2f}"), unsafe_allow_html=True)
+        with c3:
+            st.markdown(metric_card("Currency", snap.get("currency", "USD")),       unsafe_allow_html=True)
+        with c4:
+            st.markdown(metric_card("Leverage", f"1:{snap.get('leverage', 0)}"),    unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── Broker type selector ───────────────────────────────────────────────────
+    st.markdown('<div class="section-header">Select Broker</div>', unsafe_allow_html=True)
+    new_type = st.radio(
+        "",
+        options=_BROKER_KEYS,
+        format_func=lambda k: _BROKER_TYPES[k],
+        index=_BROKER_KEYS.index(cur_type),
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── MetaApi settings ───────────────────────────────────────────────────────
+    if new_type == "metaapi":
+        st.markdown("""
+        <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:18px 20px; margin-bottom:16px;">
+            <div style="color:#f0c040; font-weight:700; margin-bottom:8px;">📋 MetaApi Setup Guide</div>
+            <ol style="color:#8b949e; font-size:13px; line-height:2; margin:0; padding-left:18px;">
+                <li>Sign up free at <strong style="color:#58a6ff;">metaapi.cloud</strong></li>
+                <li>Click <strong>Add account</strong> → enter your MT5 demo credentials</li>
+                <li>Copy your <strong>API Token</strong> from the dashboard top-right</li>
+                <li>Copy the <strong>Account ID</strong> from your MT5 account card</li>
+                <li>Paste both below and click <strong>Test Connection</strong></li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+
+        ma = bcfg.setdefault("metaapi", {})
+        c1, c2 = st.columns(2)
+        with c1:
+            token = st.text_input("MetaApi Token", value=ma.get("token", ""),
+                                  type="password", placeholder="ey…")
+        with c2:
+            account_id = st.text_input("Account ID", value=ma.get("account_id", ""),
+                                       placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+
+        col_test, col_save, _ = st.columns([1, 1, 4])
+        with col_test:
+            if st.button("🔌  Test Connection", use_container_width=True):
+                with st.spinner("Connecting to MetaApi… (up to 60s first time)"):
+                    ok, msg = _broker_test("metaapi", token=token, account_id=account_id)
+                if ok:
+                    st.success(f"✅  {msg}")
+                else:
+                    st.error(f"❌  {msg}")
+
+        with col_save:
+            if st.button("💾  Save", use_container_width=True, disabled=not (token and account_id)):
+                ma["token"]      = token
+                ma["account_id"] = account_id
+                bcfg["type"]     = "metaapi"
+                cfg["broker"]    = bcfg
+                save_config(cfg)
+                st.success("Saved — restart the bot to apply")
+
+    # ── OANDA settings ─────────────────────────────────────────────────────────
+    elif new_type == "oanda":
+        st.markdown("""
+        <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:18px 20px; margin-bottom:16px;">
+            <div style="color:#f0c040; font-weight:700; margin-bottom:8px;">📋 OANDA Setup Guide</div>
+            <ol style="color:#8b949e; font-size:13px; line-height:2; margin:0; padding-left:18px;">
+                <li>Sign up at <strong style="color:#58a6ff;">oanda.com</strong> (free practice account)</li>
+                <li>Go to <strong>My Account → API Access</strong> → Generate API Token</li>
+                <li>Copy your <strong>Account ID</strong> from the dashboard</li>
+                <li>Paste both below — select <em>practice</em> for demo</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+
+        oa = bcfg.setdefault("oanda", {})
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            api_key = st.text_input("API Key", value=oa.get("api_key", ""),
+                                    type="password", placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+        with c2:
+            oanda_account = st.text_input("Account ID", value=oa.get("account_id", ""),
+                                          placeholder="001-001-XXXXXXX-001")
+        with c3:
+            environment = st.selectbox("Environment", ["practice", "live"],
+                                       index=0 if oa.get("environment", "practice") == "practice" else 1)
+
+        col_test, col_save, _ = st.columns([1, 1, 4])
+        with col_test:
+            if st.button("🔌  Test Connection", use_container_width=True):
+                with st.spinner("Connecting to OANDA…"):
+                    ok, msg = _broker_test("oanda", api_key=api_key,
+                                           oanda_account=oanda_account, environment=environment)
+                if ok:
+                    st.success(f"✅  {msg}")
+                else:
+                    st.error(f"❌  {msg}")
+
+        with col_save:
+            if st.button("💾  Save", use_container_width=True,
+                         disabled=not (api_key and oanda_account)):
+                oa["api_key"]     = api_key
+                oa["account_id"]  = oanda_account
+                oa["environment"] = environment
+                bcfg["type"]      = "oanda"
+                cfg["broker"]     = bcfg
+                save_config(cfg)
+                st.success("Saved — restart the bot to apply")
+
+    # ── Paper trading settings ─────────────────────────────────────────────────
+    else:
+        st.markdown("""
+        <div style="background:#161b22; border:1px solid #30363d; border-radius:10px; padding:18px 20px; margin-bottom:16px;">
+            <div style="color:#3fb950; font-weight:700; margin-bottom:6px;">✅ Paper Trading Active</div>
+            <div style="color:#8b949e; font-size:13px;">
+                The bot is running in full simulation mode using Yahoo Finance price data (GC=F — Gold Futures).<br>
+                No real money is at risk. All trades are virtual.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("💾  Save as Paper Mode"):
+            bcfg["type"]  = "paper"
+            cfg["broker"] = bcfg
+            save_config(cfg)
+            st.success("Saved")
+
+    # ── MetaApi install hint ───────────────────────────────────────────────────
+    if new_type == "metaapi":
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("⚙️  First-time VPS setup"):
+            st.code(
+                "# Run this once on the VPS to install the MetaApi SDK:\n"
+                "cd /home/botuser/xau_bot\n"
+                ".venv/bin/pip install metaapi-cloud-sdk",
+                language="bash",
+            )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1216,6 +1434,8 @@ def main():
         page_bot_control()
     elif page == "Live Trading":
         page_live_trading()
+    elif page == "Broker":
+        page_broker()
     elif page == "Backtest Results":
         page_dashboard()
     elif page == "Backtest":
