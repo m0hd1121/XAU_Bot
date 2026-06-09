@@ -889,7 +889,7 @@ def page_trade_log():
     ] if c in fdf.columns]
 
     st.dataframe(
-        fdf[display_cols].style.applymap(
+        fdf[display_cols].style.map(
             lambda v: f"color: {'#3fb950' if v > 0 else '#f85149'}" if isinstance(v, (int, float)) and not pd.isna(v) else "",
             subset=["pnl"] if "pnl" in display_cols else [],
         ),
@@ -1169,7 +1169,7 @@ def page_live_trading():
             })
         df_t = pd.DataFrame(rows)
         st.dataframe(
-            df_t.style.applymap(
+            df_t.style.map(
                 lambda v: f"color: {'#3fb950' if v > 0 else '#f85149'}"
                           if isinstance(v, (int, float)) else "",
                 subset=["P&L $"],
