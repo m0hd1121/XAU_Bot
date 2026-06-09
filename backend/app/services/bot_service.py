@@ -211,14 +211,25 @@ class BotService:
             return None
 
     async def is_bot_running(self) -> bool:
-        """Return True if the bot process is alive."""
+        """Return True if the bot process is alive and is actually our bot."""
         pid = self._read_pid()
         if pid is None:
             return False
         try:
             proc = psutil.Process(pid)
-            return proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE
-        except psutil.NoSuchProcess:
+            if not (proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE):
+                PID_FILE.unlink(missing_ok=True)
+                return False
+            # Verify the PID belongs to our bot, not a recycled process
+            cmdline = proc.cmdline()
+            is_ours = any("main.py" in arg for arg in cmdline)
+            if not is_ours:
+                logger.warning("PID %d is not our bot (cmdline: %s) — clearing stale PID file", pid, cmdline)
+                PID_FILE.unlink(missing_ok=True)
+                return False
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            PID_FILE.unlink(missing_ok=True)
             return False
 
     async def get_bot_status(self) -> dict:
@@ -255,9 +266,13 @@ class BotService:
         # Determine Python executable
         python = str(BOT_PYTHON) if BOT_PYTHON.exists() else "python3"
 
-        # Read mode from config
+        # Read mode from config; refuse backtest — it exits immediately and is
+        # not a valid daemon target. Force paper so the bot actually stays running.
         cfg = self.read_config()
-        mode = cfg.get("bot", {}).get("mode", "backtest")
+        mode = cfg.get("bot", {}).get("mode", "paper")
+        if mode == "backtest":
+            mode = "paper"
+            logger.info("start_bot: config mode=backtest overridden to paper (backtest exits immediately)")
 
         # Write log file path so we can capture startup errors
         log_path = BOT_ROOT / "logs" / "bot_startup.log"

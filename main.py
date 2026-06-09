@@ -142,24 +142,27 @@ def run_paper(cfg: dict) -> None:
     trades_path = data_dir / "open_trades.json"
 
     def _write_status() -> None:
-        snap = {
-            "account_number": "PAPER-001",
-            "broker":         "Paper Trading",
-            "server":         "Simulated",
-            "currency":       "USD",
-            "leverage":       100,
-            "balance":        round(balance, 2),
-            "equity":         round(equity,  2),
-            "margin":         0.0,
-            "free_margin":    round(equity,  2),
-            "margin_level":   None,
-            "connected":      True,
-            "latency_ms":     0,
-            "timestamp":      datetime.now(timezone.utc).isoformat(),
-        }
-        snap_path.write_text(json.dumps(snap))
-        if not trades_path.exists():
-            trades_path.write_text("[]")
+        try:
+            snap = {
+                "account_number": "PAPER-001",
+                "broker":         "Paper Trading",
+                "server":         "Simulated",
+                "currency":       "USD",
+                "leverage":       100,
+                "balance":        round(balance, 2),
+                "equity":         round(equity,  2),
+                "margin":         0.0,
+                "free_margin":    round(equity,  2),
+                "margin_level":   None,
+                "connected":      True,
+                "latency_ms":     0,
+                "timestamp":      datetime.now(timezone.utc).isoformat(),
+            }
+            snap_path.write_text(json.dumps(snap))
+            if not trades_path.exists():
+                trades_path.write_text("[]")
+        except Exception as _e:
+            logger.warning("Status write failed (non-fatal): %s", _e)
 
     _write_status()
     logger.info("Paper trading daemon running — equity $%.2f — waiting for new bars", equity)

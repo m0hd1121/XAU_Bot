@@ -81,9 +81,10 @@ class AccountSnapshot(BaseModel):
 _SAFE_STATUS = {
     "running": False, "paused": False, "maintenance_mode": False,
     "emergency_stopped": False, "learning_enabled": False,
-    "pid": None, "mode": "backtest",
+    "pid": None, "mode": "paper",
     "last_heartbeat": None, "last_trade_at": None,
     "open_trades_count": 0, "daily_pnl": 0.0, "equity": 0.0,
+    "last_startup_log": None,
 }
 
 
@@ -113,6 +114,17 @@ async def get_bot_status(
         equity = daily_pnl = 0.0
         open_count = 0
 
+    # Surface last few lines of startup log so the iOS app can show why the bot stopped
+    startup_log_tail: str | None = None
+    try:
+        from pathlib import Path
+        from app.config import settings
+        log_path = settings.bot_root / "logs" / "bot_startup.log"
+        if log_path.exists():
+            startup_log_tail = log_path.read_text(errors="replace")[-600:].strip() or None
+    except Exception:
+        pass
+
     return {
         **_SAFE_STATUS,
         "running":           bool(s.get("running",           False)),
@@ -121,11 +133,12 @@ async def get_bot_status(
         "emergency_stopped": bool(s.get("emergency_stopped", False)),
         "learning_enabled":  bool(s.get("learning_enabled",  False)),
         "pid":               s.get("pid"),
-        "mode":              str(s.get("mode", "backtest")),
+        "mode":              str(s.get("mode", "paper")),
         "open_trades_count": open_count,
         "daily_pnl":         daily_pnl,
         "equity":            equity,
         "updated_at":        now,
+        "last_startup_log":  startup_log_tail,
     }
 
 

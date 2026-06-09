@@ -122,6 +122,7 @@ struct BotStatus: Codable {
     let dailyPnl:         Double
     let equity:           Double
     let updatedAt:        String
+    let lastStartupLog:   String?
 
     enum CodingKeys: String, CodingKey {
         case running
@@ -137,6 +138,7 @@ struct BotStatus: Codable {
         case dailyPnl         = "daily_pnl"
         case equity
         case updatedAt        = "updated_at"
+        case lastStartupLog   = "last_startup_log"
     }
 
     var statusLabel: String {

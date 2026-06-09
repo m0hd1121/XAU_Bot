@@ -31,6 +31,11 @@ struct BotControlView: View {
                     // Activity log
                     activityLog
 
+                    // Startup log (shown when stopped so user can diagnose why)
+                    if let log = vm.botStatus?.lastStartupLog, !(vm.botStatus?.running ?? false) {
+                        startupLogCard(log)
+                    }
+
                     Color.clear.frame(height: AppSpacing.huge)
                 }
                 .padding(.horizontal, AppSpacing.screenPadding)
@@ -341,6 +346,24 @@ struct BotControlView: View {
                 RoundedRectangle(cornerRadius: AppRadius.md)
                     .strokeBorder(Color.xauWarning.opacity(0.3), lineWidth: 1)
             )
+        }
+    }
+
+    // MARK: - Startup Log
+
+    private func startupLogCard(_ log: String) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            sectionTitle("Last Startup Log")
+            ScrollView(.vertical, showsIndicators: true) {
+                Text(log)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(.xauTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(AppSpacing.md)
+            }
+            .frame(maxHeight: 180)
+            .background(Color.black.opacity(0.3))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm))
         }
     }
 
