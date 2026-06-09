@@ -114,6 +114,16 @@ def _read_and_parse(
         return [], 0
 
 
+def _read_log_lines(path: Path, tail: int = 50) -> list[str]:
+    """Return the last `tail` lines from a file."""
+    try:
+        text = path.read_text(errors="replace")
+        lines = [l for l in text.splitlines() if l.strip()]
+        return lines[-tail:]
+    except Exception:
+        return []
+
+
 def _get_log_path(log_type: str) -> Path:
     path = LOG_FILES.get(log_type)
     if path is None:
