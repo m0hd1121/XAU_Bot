@@ -137,28 +137,33 @@ class VPSService:
         return [self.get_service_status(s) for s in MANAGED_SERVICES]
 
     def restart_service(self, name: str) -> dict:
-        """Restart a managed systemd service.  Requires sudo without password for these units."""
+        """Restart a managed systemd service via D-Bus (no sudo required)."""
         if name not in MANAGED_SERVICES:
             return {"ok": False, "detail": f"Service '{name}' is not in the managed list"}
 
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "restart", name],
-                check=True,
-                timeout=30,
-                capture_output=True,
-                text=True,
-            )
-            logger.info("Service restarted: %s", name)
-            return {"ok": True, "service": name}
-        except subprocess.CalledProcessError as exc:
-            error_detail = exc.stderr.strip() if exc.stderr else str(exc)
-            logger.error("Failed to restart service %s: %s", name, error_detail)
-            return {"ok": False, "detail": error_detail}
-        except FileNotFoundError:
-            return {"ok": False, "detail": "systemctl not found — not a systemd system?"}
-        except Exception as exc:
-            return {"ok": False, "detail": str(exc)}
+        # Try systemctl without sudo first (works if the process has sufficient privileges)
+        for cmd in [
+            ["systemctl", "restart", name],
+            ["dbus-send", "--system", "--print-reply",
+             "--dest=org.freedesktop.systemd1",
+             "/org/freedesktop/systemd1",
+             "org.freedesktop.systemd1.Manager.RestartUnit",
+             f"string:{name}", "string:replace"],
+        ]:
+            try:
+                subprocess.run(cmd, check=True, timeout=30,
+                               capture_output=True, text=True)
+                logger.info("Service restarted: %s (cmd=%s)", name, cmd[0])
+                return {"ok": True, "service": name}
+            except subprocess.CalledProcessError as exc:
+                last_err = exc.stderr.strip() if exc.stderr else str(exc)
+            except FileNotFoundError:
+                last_err = f"{cmd[0]} not found"
+            except Exception as exc:
+                last_err = str(exc)
+
+        logger.error("Failed to restart service %s: %s", name, last_err)
+        return {"ok": False, "detail": last_err}
 
     # ── Process monitoring ────────────────────────────────────────────────────
 
