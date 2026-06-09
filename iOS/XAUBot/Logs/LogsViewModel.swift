@@ -65,6 +65,7 @@ final class LogsViewModel: ObservableObject {
             totalPages   = response.totalPages
             totalEntries = response.total
             errorMessage = nil
+        } catch is CancellationError {
         } catch {
             errorMessage = error.localizedDescription
         }

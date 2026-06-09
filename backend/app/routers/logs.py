@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -32,39 +33,85 @@ _BOT_ROOT = settings.bot_root
 
 LOG_FILES: dict[str, Path] = {
     "bot":      _BOT_ROOT / "logs" / "xau_bot.log",
+    "api":      settings.api_log_file,
+    "trades":   _BOT_ROOT / "logs" / "trades.csv",
     "strategy": _BOT_ROOT / "logs" / "strategy.log",
     "learning": _BOT_ROOT / "logs" / "learning.log",
     "error":    _BOT_ROOT / "logs" / "error.log",
-    "api":      settings.api_log_file,
 }
+
+# Matches: "2026-06-09 10:09:07  INFO      __main__  message text"
+_LOG_RE = re.compile(
+    r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s{2,}(\w+)\s{2,}(\S+)\s{2,}(.+)$'
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _read_log_lines(
+def _parse_line(line: str, fallback_level: str = "INFO") -> dict:
+    """Parse a structured log line into {timestamp, level, logger, message}."""
+    m = _LOG_RE.match(line.strip())
+    if m:
+        return {
+            "timestamp": m.group(1),
+            "level":     m.group(2).upper(),
+            "logger":    m.group(3),
+            "message":   m.group(4),
+            "extra":     None,
+        }
+    # Unstructured line (e.g. trades CSV row or raw output)
+    return {
+        "timestamp": "",
+        "level":     fallback_level,
+        "logger":    "raw",
+        "message":   line.strip(),
+        "extra":     None,
+    }
+
+
+def _read_and_parse(
     path: Path,
-    tail: int = 200,
-    search: Optional[str] = None,
-    level: Optional[str] = None,
-    offset_lines: int = 0,
-) -> list[str]:
-    """Read and filter log lines.  Returns the last `tail` matching lines."""
+    search: Optional[str],
+    level: Optional[str],
+    page: int,
+    page_size: int,
+    is_csv: bool = False,
+) -> tuple[list[dict], int]:
+    """Read log file, parse lines, filter, paginate. Returns (entries, total)."""
     if not path.exists():
-        return []
+        return [], 0
     try:
-        text = path.read_text(errors="replace")
-        lines = text.splitlines()
-        if search:
-            lines = [line for line in lines if search.lower() in line.lower()]
+        text  = path.read_text(errors="replace")
+        lines = [l for l in text.splitlines() if l.strip()]
+
+        # Skip CSV header
+        if is_csv and lines and lines[0].startswith("ticket,"):
+            lines = lines[1:]
+
+        # Parse
+        entries = [_parse_line(l, fallback_level="TRADE" if is_csv else "INFO") for l in lines]
+
+        # Filter by level
         if level:
             upper = level.upper()
-            lines = [line for line in lines if upper in line]
-        if offset_lines:
-            lines = lines[offset_lines:]
-        return lines[-tail:]
+            entries = [e for e in entries if e["level"] == upper]
+
+        # Filter by search
+        if search:
+            low = search.lower()
+            entries = [e for e in entries if low in e["message"].lower()
+                                             or low in e["logger"].lower()]
+
+        # Reverse so newest first
+        entries = list(reversed(entries))
+
+        total  = len(entries)
+        offset = (page - 1) * page_size
+        page_entries = entries[offset: offset + page_size]
+        return page_entries, total
     except Exception as exc:
         logger.warning("Failed to read log %s: %s", path, exc)
-        return []
+        return [], 0
 
 
 def _get_log_path(log_type: str) -> Path:
@@ -93,25 +140,55 @@ async def list_logs(_user=Depends(get_current_user)) -> dict:
 
 
 @router.get(
-    "/{log_type}",
-    summary="Fetch log lines with optional search/level filter",
+    "",
+    summary="Fetch parsed log entries (iOS-compatible)",
 )
-async def get_logs(
-    log_type: str,
-    tail:    int           = Query(200, ge=10, le=5000, description="Number of lines to return"),
-    search:  Optional[str] = Query(None, description="Case-insensitive substring filter"),
-    level:   Optional[str] = Query(None, description="Filter by log level (INFO, ERROR, etc.)"),
-    offset:  int           = Query(0, ge=0, description="Skip first N matching lines"),
+async def get_logs_query(
+    type:      str           = Query("bot", description="Log type: bot | api | trades | strategy | learning | error"),
+    level:     Optional[str] = Query(None,  description="Filter by level: INFO | WARNING | ERROR | CRITICAL"),
+    search:    Optional[str] = Query(None,  description="Case-insensitive substring filter"),
+    page:      int           = Query(1,     ge=1),
+    page_size: int           = Query(50,    ge=1, le=500),
     _user=Depends(get_current_user),
 ) -> dict:
-    path = _get_log_path(log_type)
-    lines = _read_log_lines(path, tail=tail, search=search, level=level, offset_lines=offset)
+    """iOS-compatible endpoint: GET /logs?type=bot&page=1&page_size=50"""
+    path     = _get_log_path(type)
+    is_csv   = path.suffix == ".csv"
+    entries, total = _read_and_parse(path, search=search, level=level,
+                                      page=page, page_size=page_size, is_csv=is_csv)
+    total_pages = max(1, (total + page_size - 1) // page_size)
     return {
-        "log_type": log_type,
-        "path": str(path),
-        "lines": lines,
-        "count": len(lines),
-        "filters": {"search": search, "level": level, "tail": tail},
+        "logs":       entries,
+        "total":      total,
+        "page":       page,
+        "page_size":  page_size,
+        "total_pages": total_pages,
+    }
+
+
+@router.get(
+    "/{log_type}",
+    summary="Fetch parsed log entries by path param",
+)
+async def get_logs_path(
+    log_type:  str,
+    level:     Optional[str] = Query(None),
+    search:    Optional[str] = Query(None),
+    page:      int           = Query(1,  ge=1),
+    page_size: int           = Query(50, ge=1, le=500),
+    _user=Depends(get_current_user),
+) -> dict:
+    path     = _get_log_path(log_type)
+    is_csv   = path.suffix == ".csv"
+    entries, total = _read_and_parse(path, search=search, level=level,
+                                      page=page, page_size=page_size, is_csv=is_csv)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return {
+        "logs":       entries,
+        "total":      total,
+        "page":       page,
+        "page_size":  page_size,
+        "total_pages": total_pages,
     }
 
 
