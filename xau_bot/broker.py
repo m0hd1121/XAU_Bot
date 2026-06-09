@@ -120,6 +120,10 @@ class DWXBroker(BrokerBase):
         self._files = Path(mt4_files_path).expanduser()
         self._magic = magic
         self._cmd_id = 0
+        # File names written by XAU_Bridge.mq5 EA
+        self._ACCOUNTS_FILE  = "XAU_Accounts.json"
+        self._POSITIONS_FILE = "XAU_Positions.json"
+        self._ORDERS_FILE    = "XAU_Orders.json"
 
     # ── File paths ────────────────────────────────────────────────────────────
 
@@ -132,7 +136,7 @@ class DWXBroker(BrokerBase):
         import time
         self._cmd_id += 1
         payload["_magic"] = self._magic
-        cmd_file = self._f(f"DWX_Commands_{self._cmd_id % 20}.txt")
+        cmd_file = self._f(self._ORDERS_FILE)
         cmd_file.write_text(json.dumps(payload))
 
         # Wait for EA to consume the file (it deletes or empties it when done)
@@ -151,11 +155,11 @@ class DWXBroker(BrokerBase):
     # ── Interface ─────────────────────────────────────────────────────────────
 
     def get_account_info(self) -> dict:
-        acct_file = self._f("DWX_Accounts.json")
+        acct_file = self._f(self._ACCOUNTS_FILE)
         if not acct_file.exists():
             raise FileNotFoundError(
-                f"DWX_Accounts.json not found at {self._files}. "
-                "Is MT4 running with DWX Connect EA attached to a chart?"
+                f"{self._ACCOUNTS_FILE} not found at {self._files}. "
+                "Is MT5 running with XAU_Bridge EA attached to a chart?"
             )
         data = json.loads(acct_file.read_text())
         return {
@@ -173,7 +177,7 @@ class DWXBroker(BrokerBase):
         }
 
     def get_positions(self) -> list[dict]:
-        orders_file = self._f("DWX_Orders_All.json")
+        orders_file = self._f(self._POSITIONS_FILE)
         if not orders_file.exists():
             return []
         try:

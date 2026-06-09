@@ -1335,8 +1335,7 @@ def page_broker():
 
         # Check if MT4 is actually running
         files_dir = Path(mt4_path).expanduser()
-        acct_file = files_dir / "DWX_Accounts.json"
-        orders_file = files_dir / "DWX_Orders_All.json"
+        acct_file = files_dir / "XAU_Accounts.json"
         mt4_running = acct_file.exists()
 
         if mt4_running:
