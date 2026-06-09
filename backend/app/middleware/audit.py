@@ -49,9 +49,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
         body_bytes = await request.body()
         body_hash  = hashlib.sha256(body_bytes).hexdigest() if body_bytes else None
 
-        # Restore body for downstream handlers
+        # Restore body for downstream handlers — signal disconnect after first read
+        body_sent = False
+
         async def receive():
-            return {"type": "http.request", "body": body_bytes}
+            nonlocal body_sent
+            if not body_sent:
+                body_sent = True
+                return {"type": "http.request", "body": body_bytes, "more_body": False}
+            return {"type": "http.disconnect"}
+
         request._receive = receive  # type: ignore[attr-defined]
 
         t0       = time.monotonic()
