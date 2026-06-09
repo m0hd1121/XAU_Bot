@@ -141,14 +141,16 @@ class VPSService:
         if name not in MANAGED_SERVICES:
             return {"ok": False, "detail": f"Service '{name}' is not in the managed list"}
 
-        # Try systemctl without sudo first (works if the process has sufficient privileges)
+        # systemctl accepts names without suffix; D-Bus requires "name.service"
+        unit_name = name if name.endswith(".service") else f"{name}.service"
+
         for cmd in [
             ["systemctl", "restart", name],
             ["dbus-send", "--system", "--print-reply",
              "--dest=org.freedesktop.systemd1",
              "/org/freedesktop/systemd1",
              "org.freedesktop.systemd1.Manager.RestartUnit",
-             f"string:{name}", "string:replace"],
+             f"string:{unit_name}", "string:replace"],
         ]:
             try:
                 subprocess.run(cmd, check=True, timeout=30,
