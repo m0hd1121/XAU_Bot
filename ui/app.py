@@ -653,11 +653,19 @@ def page_configuration():
             cfg["bot"]["mode"]      = st.selectbox("Mode", ["backtest","paper","live"],
                                                      index=["backtest","paper","live"].index(cfg["bot"]["mode"]))
             cfg["bot"]["symbol"]    = st.text_input("Symbol", cfg["bot"]["symbol"])
-            cfg["bot"]["timeframe"] = st.selectbox("Timeframe", ["1H","4H","1D","15min"],
-                                                     index=["1H","4H","1D","15min"].index(cfg["bot"]["timeframe"]))
+            tf_opts = ["1H","4H","1D","15min","5M","1M","30min"]
+            cur_tf  = cfg["bot"]["timeframe"]
+            if cur_tf not in tf_opts:
+                tf_opts.insert(0, cur_tf)
+            cfg["bot"]["timeframe"] = st.selectbox("Timeframe", tf_opts,
+                                                     index=tf_opts.index(cur_tf))
         with c2:
-            cfg["bot"]["htf_timeframe"] = st.selectbox("HTF Timeframe", ["4H","1D","1H"],
-                                                         index=["4H","1D","1H"].index(cfg["bot"]["htf_timeframe"]))
+            htf_opts = ["4H","1D","1H","8H","12H"]
+            cur_htf  = cfg["bot"]["htf_timeframe"]
+            if cur_htf not in htf_opts:
+                htf_opts.insert(0, cur_htf)
+            cfg["bot"]["htf_timeframe"] = st.selectbox("HTF Timeframe", htf_opts,
+                                                         index=htf_opts.index(cur_htf))
             cfg["data"]["csv_path"] = st.text_input("Data CSV Path", cfg["data"]["csv_path"])
 
     # ── Risk settings ─────────────────────────────────────────────────────────
