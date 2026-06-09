@@ -78,6 +78,35 @@ class AccountSnapshot(BaseModel):
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
 
+@router.get("/bot-status", summary="Bot status for control panel")
+async def get_bot_status(
+    _current_user=Depends(get_current_user),
+) -> dict:
+    """
+    Returns the BotStatus payload consumed by the iOS Bot Control screen.
+    Includes runtime state plus live financial metrics from the snapshot.
+    """
+    from datetime import timezone
+    s    = await bot_service.get_bot_status()
+    snap = await bot_service.get_dashboard_snapshot()
+    now  = datetime.now(tz=timezone.utc).isoformat()
+    return {
+        "running":           s.get("running",           False),
+        "paused":            s.get("paused",            False),
+        "maintenance_mode":  s.get("maintenance_mode",  False),
+        "emergency_stopped": s.get("emergency_stopped", False),
+        "learning_enabled":  s.get("learning_enabled",  False),
+        "pid":               s.get("pid"),
+        "mode":              s.get("mode",              "backtest"),
+        "last_heartbeat":    snap.last_heartbeat.isoformat() if snap.last_heartbeat else None,
+        "last_trade_at":     snap.last_trade_time.isoformat() if snap.last_trade_time else None,
+        "open_trades_count": snap.open_trades_count,
+        "daily_pnl":         snap.daily_pnl,
+        "equity":            snap.equity,
+        "updated_at":        now,
+    }
+
+
 @router.get("/snapshot", response_model=AccountSnapshot, summary="Full dashboard snapshot")
 async def get_dashboard_snapshot(
     _current_user=Depends(get_current_user),

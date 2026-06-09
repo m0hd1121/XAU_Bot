@@ -41,9 +41,17 @@ router = APIRouter()
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
 class ControlResponse(BaseModel):
-    ok: bool
-    detail: str = ""
-    pid: Optional[int] = None
+    success: bool
+    message: str = ""
+    data: Optional[Any] = None
+
+    @classmethod
+    def from_result(cls, result: dict) -> "ControlResponse":
+        return cls(
+            success=result.get("ok", result.get("success", False)),
+            message=result.get("detail", result.get("message", "")),
+            data={"pid": result["pid"]} if result.get("pid") else None,
+        )
 
 
 class BotStatusResponse(BaseModel):
@@ -97,35 +105,35 @@ async def bot_status(
 async def start_bot(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.start_bot()
     await _log_action(user, "start", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post("/stop", response_model=ControlResponse, summary="Stop the bot process (SIGTERM)")
 async def stop_bot(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.stop_bot()
     await _log_action(user, "stop", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post("/restart", response_model=ControlResponse, summary="Restart the bot process")
 async def restart_bot(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.restart_bot()
     await _log_action(user, "restart", result)
-    return ControlResponse(ok=result["ok"], detail=str(result))
+    return ControlResponse.from_result(result)
 
 
 @router.post("/pause", response_model=ControlResponse, summary="Pause trading (flag file)")
 async def pause_bot(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.pause_bot()
     await _log_action(user, "pause", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post("/resume", response_model=ControlResponse, summary="Resume trading (remove flag)")
 async def resume_bot(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.resume_bot()
     await _log_action(user, "resume", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post(
@@ -136,7 +144,7 @@ async def resume_bot(user=Depends(require_admin)) -> ControlResponse:
 async def emergency_stop(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.emergency_stop()
     await _log_action(user, "emergency_stop", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post(
@@ -147,7 +155,7 @@ async def emergency_stop(user=Depends(require_admin)) -> ControlResponse:
 async def clear_emergency(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.clear_emergency_stop()
     await _log_action(user, "clear_emergency", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post(
@@ -158,7 +166,7 @@ async def clear_emergency(user=Depends(require_admin)) -> ControlResponse:
 async def enable_maintenance(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.enable_maintenance()
     await _log_action(user, "maintenance_enable", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post(
@@ -169,7 +177,7 @@ async def enable_maintenance(user=Depends(require_admin)) -> ControlResponse:
 async def disable_maintenance(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.disable_maintenance()
     await _log_action(user, "maintenance_disable", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post(
@@ -180,7 +188,7 @@ async def disable_maintenance(user=Depends(require_admin)) -> ControlResponse:
 async def enable_learning(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.enable_learning()
     await _log_action(user, "learning_enable", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
 
 
 @router.post(
@@ -191,4 +199,4 @@ async def enable_learning(user=Depends(require_admin)) -> ControlResponse:
 async def disable_learning(user=Depends(require_admin)) -> ControlResponse:
     result = await bot_service.disable_learning()
     await _log_action(user, "learning_disable", result)
-    return ControlResponse(**result)
+    return ControlResponse.from_result(result)
