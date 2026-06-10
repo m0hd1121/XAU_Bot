@@ -47,15 +47,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setToken(stored)
-    apiClient
-      .getMe()
+
+    // 8-second deadline — if the API is unreachable, clear the token and show login
+    const deadline = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('auth_timeout')), 8_000),
+    )
+
+    Promise.race([apiClient.getMe(), deadline])
       .then((profile) => {
         setUser(profile)
-        // Reconnect WS with restored token
         wsClient.connect(stored)
       })
       .catch(() => {
-        // Token invalid — clear it
         apiClient.clearToken()
         setToken(null)
       })
