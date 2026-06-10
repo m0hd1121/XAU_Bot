@@ -1,0 +1,17 @@
+[Unit]
+Description=XAU Bot — all services (Xvfb, MT5, VNC, API, UI, Bot)
+After=network.target
+
+[Service]
+Type=forking
+User=botuser
+WorkingDirectory=/home/botuser/xau_bot
+ExecStart=/bin/bash /home/botuser/xau_bot/scripts/start_all.sh
+ExecStop=/bin/bash -c 'pkill -f main.py; pkill -f uvicorn; pkill -f streamlit; pkill -f websockify; pkill x11vnc; pkill -f terminal64.exe; pkill Xvfb'
+Restart=on-failure
+RestartSec=15
+StandardOutput=append:/home/botuser/xau_bot/logs/systemd.log
+StandardError=append:/home/botuser/xau_bot/logs/systemd.log
+
+[Install]
+WantedBy=multi-user.target

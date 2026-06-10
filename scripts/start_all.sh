@@ -1,12 +1,11 @@
 #!/bin/bash
-# start_all.sh — Start all XAU Bot services
+# start_all.sh — Start all XAU Bot services (survives SSH session close)
 cd /home/botuser/xau_bot
-
 mkdir -p logs
 
 # Start virtual display
 pkill Xvfb 2>/dev/null; sleep 1
-Xvfb :99 -screen 0 1024x768x16 &
+nohup Xvfb :99 -screen 0 1024x768x16 > logs/xvfb.log 2>&1 &
 sleep 2
 export DISPLAY=:99
 
@@ -21,8 +20,8 @@ sleep 12
 
 # Start VNC (for MT5 access)
 pkill x11vnc 2>/dev/null; pkill websockify 2>/dev/null; sleep 1
-x11vnc -display :99 -nopw -rfbport 5900 -bg -quiet
-nohup websockify --web=/usr/share/novnc/ 6080 localhost:5900 > /dev/null 2>&1 &
+nohup x11vnc -display :99 -nopw -rfbport 5900 -forever -quiet > logs/vnc.log 2>&1 &
+nohup websockify --web=/usr/share/novnc/ 6080 localhost:5900 > logs/novnc.log 2>&1 &
 echo "VNC started on :6080"
 
 # Start API backend
@@ -40,6 +39,11 @@ nohup .venv/bin/streamlit run ui/app.py \
   --server.port 8502 --server.address 0.0.0.0 --server.headless true \
   > logs/ui.log 2>&1 &
 echo "Streamlit started: $!"
+
+# Start trading bot
+nohup .venv/bin/python main.py --mode live \
+  > logs/xau_bot.log 2>&1 &
+echo "Bot started: $!"
 
 echo ""
 echo "All services started. MT5 needs ~30s to fully load."
