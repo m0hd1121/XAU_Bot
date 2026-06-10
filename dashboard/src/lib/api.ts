@@ -220,17 +220,11 @@ class ApiClient {
   // ── Auth ────────────────────────────────────────────────────────────────
 
   async login(req: LoginRequest): Promise<AuthTokens> {
-    // FastAPI OAuth2 uses form-encoded body
-    const url = `${this.baseUrl}/api/v1/auth/token`
-    const body = new URLSearchParams({
-      username: req.username,
-      password: req.password,
-      grant_type: 'password',
-    })
+    const url = `${this.baseUrl}/api/v1/auth/login`
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: req.username, password: req.password }),
     })
     if (!res.ok) {
       throw await this.parseError(res)
