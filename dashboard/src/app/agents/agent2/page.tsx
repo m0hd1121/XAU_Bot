@@ -541,10 +541,8 @@ function HistoryTab() {
               <LineChart
                 data={riskOverTime}
                 xKey="time"
-                yKey="risk"
+                lines={[{ key: 'risk', color: '#f59e0b', label: 'Risk Score' }]}
                 height={160}
-                color="#f59e0b"
-                yDomain={[0, 1]}
               />
             )}
           </CardContent>
