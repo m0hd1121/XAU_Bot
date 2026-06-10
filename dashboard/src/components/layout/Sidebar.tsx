@@ -15,6 +15,8 @@ import {
   FlaskConical,
   Brain,
   TrendingUp,
+  MessageSquare,
+  Shield,
   ChevronDown,
   ChevronRight,
   PanelLeftClose,
@@ -57,6 +59,9 @@ const NAV_ITEMS: NavItem[] = [
   { icon: Settings, label: 'Configuration', href: '/config' },
   { icon: ScrollText, label: 'Logs', href: '/logs' },
   { icon: Bell, label: 'Notifications', href: '/notifications' },
+  { icon: Brain, label: 'Learning', href: '/learning' },
+  { icon: MessageSquare, label: 'Communication', href: '/communication' },
+  { icon: Shield, label: 'Admin', href: '/admin' },
 ]
 
 // ─── Props ────────────────────────────────────────────────────────────────────
