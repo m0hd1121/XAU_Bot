@@ -83,3 +83,5 @@ export default function StatusDot({
     </span>
   )
 }
+
+export { StatusDot }

@@ -175,3 +175,5 @@ export default function DataTable<T extends object>({
     </div>
   )
 }
+
+export { DataTable }
