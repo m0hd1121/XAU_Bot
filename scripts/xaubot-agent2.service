@@ -1,0 +1,18 @@
+[Unit]
+Description=XAU Bot — Agent 2: Market Intelligence & Analysis
+After=network.target xaubot.service
+Wants=xaubot.service
+
+[Service]
+Type=simple
+User=botuser
+WorkingDirectory=/home/botuser/xau_bot
+ExecStart=/home/botuser/xau_bot/.venv/bin/python agents/run_agent.py 2
+Restart=always
+RestartSec=30
+StandardOutput=append:/home/botuser/xau_bot/logs/agent2.log
+StandardError=append:/home/botuser/xau_bot/logs/agent2.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

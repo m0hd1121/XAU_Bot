@@ -88,6 +88,111 @@ services:
       com.xaubot.description: "XAU/USD Price Action Trading Bot"
       com.xaubot.component: "main"
 
+  # ── Agent 1: Strategy Research & Self-Learning ────────────────────────────
+  xaubot-agent1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: xaubot:latest
+    container_name: xaubot-agent1
+    command: python agents/run_agent.py 1
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - xaubot
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.xaubot.description: "Agent 1: Strategy Research & Self-Learning"
+      com.xaubot.component: "agent1"
+
+  # ── Agent 2: Market Intelligence & Analysis ───────────────────────────────
+  xaubot-agent2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: xaubot:latest
+    container_name: xaubot-agent2
+    command: python agents/run_agent.py 2
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - xaubot
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.xaubot.description: "Agent 2: Market Intelligence & Analysis"
+      com.xaubot.component: "agent2"
+
+  # ── Agent 3: Live Trader & Risk Manager ──────────────────────────────────
+  xaubot-agent3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: xaubot:latest
+    container_name: xaubot-agent3
+    command: python agents/run_agent.py 3
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # MT5 file bridge — Agent 3 reads/writes trade JSON files
+      - ${MT5_FILES_PATH:-/home/botuser/.wine-mt4/drive_c/Program Files/MetaTrader 5/MQL5/Files}:/app/mt5files
+    depends_on:
+      - xaubot
+      - xaubot-agent2
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.xaubot.description: "Agent 3: Live Trader & Risk Manager"
+      com.xaubot.component: "agent3"
+
 # =============================================================
 # Named volumes (declared but using bind mounts above for easy
 # access to data from the host without docker volume commands).

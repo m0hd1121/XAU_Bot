@@ -153,6 +153,29 @@ broker:
     account_id: ""
     environment: "practice"   # "practice" | "live"
 
+# ── Multi-Agent System ───────────────────────────────────────
+agents:
+  db_path: "${DATA_DIR:-data}/agents.db"   # Shared SQLite DB for inter-agent comms
+
+  agent1:                                  # Strategy Research & Self-Learning
+    enabled: true
+    population_size: 30                    # Number of strategy genomes in GA population
+    shadow_mode_bars: 200                  # Bars of shadow trading before promotion eligibility
+    auto_promote: false                    # true = auto-deploy best strategy; false = require manual approval
+    evolution_sleep_seconds: 120           # Sleep between evolution cycles (GA is CPU-intensive)
+
+  agent2:                                  # Market Intelligence & Analysis
+    enabled: true
+    cycle_interval_seconds: 60             # How often to refresh market analysis
+    economic_calendar: true               # Enable ForexFactory economic calendar scraping
+    risk_score_halt_threshold: 0.75        # Agent 3 defers trading above this risk score
+
+  agent3:                                  # Live Trader & Risk Manager
+    enabled: true
+    cycle_interval_seconds: 30             # How often to scan for new setups
+    require_agent2_intel: true             # Block trading if Agent 2 hasn't published recently
+    intel_max_age_seconds: 300             # Treat intel as stale if older than 5 minutes
+
 # ── Logging ──────────────────────────────────────────────────
 logging:
   level: "INFO"                    # DEBUG | INFO | WARNING | ERROR

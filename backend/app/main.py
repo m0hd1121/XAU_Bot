@@ -171,6 +171,7 @@ from app.routers import (
     trades,
     vps,
 )
+from app.routers.agents import router as agents_router
 from app.websocket.manager import ws_router
 
 API_PREFIX = "/api/v1"
@@ -187,6 +188,7 @@ app.include_router(vps.router,          prefix=f"{API_PREFIX}/vps",            t
 app.include_router(logs.router,         prefix=f"{API_PREFIX}/logs",           tags=["Logs"])
 app.include_router(backup.router,       prefix=f"{API_PREFIX}/backups",        tags=["Backup"])
 app.include_router(notifications.router,prefix=f"{API_PREFIX}/notifications",  tags=["Notifications"])
+app.include_router(agents_router,       prefix=f"{API_PREFIX}",                tags=["Agents"])
 app.include_router(ws_router,           prefix=f"{API_PREFIX}/ws",             tags=["WebSocket"])
 
 

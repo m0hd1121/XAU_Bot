@@ -1,0 +1,18 @@
+[Unit]
+Description=XAU Bot — Agent 3: Live Trader & Risk Manager
+After=network.target xaubot.service xaubot-agent2.service
+Wants=xaubot.service
+
+[Service]
+Type=simple
+User=botuser
+WorkingDirectory=/home/botuser/xau_bot
+ExecStart=/home/botuser/xau_bot/.venv/bin/python agents/run_agent.py 3
+Restart=always
+RestartSec=15
+StandardOutput=append:/home/botuser/xau_bot/logs/agent3.log
+StandardError=append:/home/botuser/xau_bot/logs/agent3.log
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

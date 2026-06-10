@@ -96,6 +96,101 @@ SwiftUI + MVVM. Every screen follows the `*View` / `*ViewModel` pattern.
 
 Optional module (disabled by default: `learning.enabled: false`). `LearningEngine` orchestrates 7 sub-modules. Its only output is a `confidence_score` that can gate entries — it cannot override risk rules, stop losses, or drawdown limits.
 
+## Multi-Agent System
+
+The project includes three autonomous trading agents that run as independent processes alongside the main bot. They share a single SQLite database (`data/agents.db`) and communicate exclusively through it via a pub/sub message bus.
+
+### Architecture
+
+| Agent | Role | Module |
+|-------|------|--------|
+| Agent 1 | Strategy Research & Self-Learning — runs genetic optimisation, backtests, walk-forward validation | `agents/agent1.py` (`ResearchAgent`) |
+| Agent 2 | Market Intelligence & Analysis — regime detection, technical analysis, fundamental event monitoring | `agents/agent2.py` (`IntelligenceAgent`) |
+| Agent 3 | Live Trader & Risk Manager — consumes intel from Agent 2, applies Agent 1 strategies, executes trades | `agents/agent3.py` (`TraderAgent`) |
+
+All three extend `agents/base_agent.py:BaseAgent` which provides heartbeat loops, control-plane polling (pause/resume/stop), SIGTERM handling, and metrics collection.
+
+### Running agents
+
+```bash
+# Start all three agents (with 5-second gaps between each)
+bash scripts/start_agents.sh
+
+# Start a single agent
+bash scripts/start_agents.sh 1
+.venv/bin/python agents/run_agent.py 2
+.venv/bin/python agents/run_agent.py 3
+
+# Stop all agents
+for N in 1 2 3; do
+  pid_file="/tmp/xaubot_agent${N}.pid"
+  [[ -f "$pid_file" ]] && kill "$(cat "$pid_file")" && rm "$pid_file"
+done
+```
+
+### Package structure (`agents/`)
+
+```
+agents/
+  __init__.py
+  base_agent.py          # Abstract BaseAgent — lifecycle, heartbeat, control loop
+  message_bus.py         # Pub/sub: publish(), poll(), channel/event constants
+  run_agent.py           # CLI entry point: python agents/run_agent.py <1|2|3>
+  shared_db.py           # SQLite helpers (connect, get_all_agent_states, …)
+  agent1.py              # ResearchAgent  (to be created)
+  agent2.py              # IntelligenceAgent  (to be created)
+  agent3.py              # TraderAgent  (to be created)
+  evolution/
+    genetic_optimizer.py
+    fitness_evaluator.py
+    strategy_genome.py
+  analysis/              # Agent 2 analysis modules
+```
+
+### How agents communicate
+
+Agents communicate exclusively through `data/agents.db`:
+
+- **Heartbeat / state** — each agent upserts a row in `agent_state` every 10 seconds. The API reads this to show live status.
+- **Message bus** — `agents/message_bus.py` wraps an `events` table. Producers call `publish(channel, event_type, payload, published_by)`. Consumers call `poll(channels, since_timestamp)` on a timer (no blocking, no external broker).
+- **Shared tables** — Agent 1 writes to `strategy_candidates`; Agent 2 writes to `market_intel`; Agent 3 writes to `trade_decisions`. Agents read each other's tables directly.
+
+Key channel constants: `CH_SYSTEM`, `CH_STRATEGY`, `CH_MARKET`, `CH_TRADES`
+Key control events: `EV_AGENT_PAUSE`, `EV_AGENT_RESUME`, `EV_AGENT_STOP`, `EV_AGENT_RESTART`
+
+Control commands from the API (via `POST /api/v1/agents/{agent_id}/pause` etc.) publish to `CH_SYSTEM`; each agent's `_control_loop` picks them up within 5 seconds.
+
+### Key config keys
+
+```yaml
+agents:
+  db_path: data/agents.db        # override with AGENTS_DB_PATH env var
+
+  agent1:
+    population_size: 50          # genomes per generation
+    auto_promote: false          # promote validated strategies automatically
+    shadow_mode_bars: 500        # candles to run in shadow before live
+
+  agent2:
+    update_interval_seconds: 60  # how often to refresh market intel
+
+  agent3:
+    use_agent2_intel: true       # gate trades on Agent 2 regime
+    use_agent1_strategy: true    # swap active strategy when Agent 1 promotes one
+```
+
+### API endpoints
+
+The FastAPI backend exposes the full agent control plane under `/api/v1/agents/` — see `backend/app/routers/agents.py`. All endpoints require JWT auth.
+
+### Systemd units (production)
+
+```bash
+sudo cp scripts/xaubot-agent{1,2,3}.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now xaubot-agent1 xaubot-agent2 xaubot-agent3
+```
+
 ## Configuration
 
 `config.yaml` is the single source of truth for the trading engine. Deployment-specific values use `${VAR:-default}` so they can be overridden via a `.env` file (sourced by `scripts/start_all.sh`). Copy `.env.example` to `.env` and fill in VPS-specific values.

@@ -15,6 +15,9 @@ requests>=2.31.0
 streamlit>=1.32.0
 plotly>=5.18.0
 
+# Multi-agent system
+psutil>=5.9.0          # CPU/memory metrics in BaseAgent heartbeat
+
 # Optional: broker connectors (install the one you need)
 # metaapi-cloud-sdk>=27.0.0  # MT5/MT4 cloud bridge — works on Linux VPS
 # (OANDA uses requests which is already listed above)
