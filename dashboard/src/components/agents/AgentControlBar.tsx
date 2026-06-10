@@ -32,11 +32,11 @@ const STATUS_LABELS: Record<AgentStatus, string> = {
   stopped: 'Stopped',
 }
 
-const STATUS_DOT_MAP: Record<AgentStatus, 'online' | 'offline' | 'degraded' | 'unknown'> = {
-  running: 'online',
-  paused: 'degraded',
-  error: 'offline',
-  stopped: 'unknown',
+const STATUS_DOT_MAP: Record<AgentStatus, 'running' | 'paused' | 'error' | 'stopped'> = {
+  running: 'running',
+  paused: 'paused',
+  error: 'error',
+  stopped: 'stopped',
 }
 
 const STATUS_TEXT_CLASS: Record<AgentStatus, string> = {
@@ -95,7 +95,7 @@ export function AgentControlBar({
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
       {/* Status display */}
       <div className="flex items-center gap-3">
-        <StatusDot status={STATUS_DOT_MAP[status]} size="lg" pulse={status === 'running'} />
+        <StatusDot status={STATUS_DOT_MAP[status]} size="lg" />
         <div>
           <p className="text-zinc-400 text-xs uppercase tracking-wider">Agent Status</p>
           <p className={cn('text-base font-semibold', STATUS_TEXT_CLASS[status])}>

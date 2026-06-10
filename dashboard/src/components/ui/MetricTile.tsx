@@ -16,6 +16,7 @@ interface MetricTileProps {
   icon?: React.ReactNode
   onClick?: () => void
   className?: string
+  valueClassName?: string
 }
 
 function ChangeIndicator({ change, colorize }: { change: number; colorize: boolean }) {
@@ -65,6 +66,7 @@ export default function MetricTile({
   icon,
   onClick,
   className,
+  valueClassName,
 }: MetricTileProps) {
   const valueColor =
     colorize && typeof change === 'number'
@@ -103,6 +105,7 @@ export default function MetricTile({
               'font-semibold font-mono leading-tight tracking-tight',
               valueSize[size],
               valueColor,
+              valueClassName,
             )}
           >
             {prefix}

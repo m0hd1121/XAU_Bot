@@ -163,7 +163,7 @@ export function AgentCard({ agent, onControl, isPending = false, className }: Ag
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <StatusDot status={agent.status === 'running' ? 'online' : agent.status === 'paused' ? 'degraded' : agent.status === 'error' ? 'offline' : 'unknown'} size="lg" />
+            <StatusDot status={agent.status} size="lg" />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="text-zinc-100 font-semibold text-sm">{label.title}</span>

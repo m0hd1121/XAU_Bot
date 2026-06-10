@@ -17,14 +17,11 @@ export interface Agent3TraderProps {
   loading?: boolean
 }
 
-const STATUS_DOT_MAP: Record<
-  Agent3TraderProps['status'],
-  'online' | 'offline' | 'degraded' | 'unknown'
-> = {
-  running: 'online',
-  paused: 'degraded',
-  error: 'offline',
-  stopped: 'unknown',
+const STATUS_DOT_MAP: Record<Agent3TraderProps['status'], 'running' | 'paused' | 'error' | 'stopped'> = {
+  running: 'running',
+  paused: 'paused',
+  error: 'error',
+  stopped: 'stopped',
 }
 
 const STATUS_TEXT: Record<Agent3TraderProps['status'], string> = {
@@ -87,7 +84,6 @@ export function Agent3Trader({
           <StatusDot
             status={STATUS_DOT_MAP[status]}
             size="md"
-            pulse={status === 'running'}
           />
           <div>
             <p className="text-zinc-400 text-[10px] uppercase tracking-wider">Agent 3 — Trader</p>

@@ -20,7 +20,7 @@ import { Modal } from '@/components/ui/Modal'
 import { JsonViewer } from '@/components/ui/JsonViewer'
 import { DataTable } from '@/components/ui/DataTable'
 import { AgentControlBar } from '@/components/agents/AgentControlBar'
-import { Link } from 'next/link'
+import Link from 'next/link'
 import {
   AlertTriangle,
   ExternalLink,
@@ -150,7 +150,7 @@ function DecisionModal({
   if (!decision) return null
   const exp = decision.explanation
   return (
-    <Modal open={open} onClose={onClose} maxWidth="lg">
+    <Modal open={open} onClose={onClose} size="lg">
       <div className="bg-zinc-950 border border-zinc-800 rounded-xl overflow-hidden max-h-[90vh] flex flex-col">
         <div className="bg-zinc-900 border-b border-zinc-800 px-5 py-4 flex items-start justify-between gap-3">
           <div>

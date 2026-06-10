@@ -101,7 +101,7 @@ export default function LogsPage() {
               variant="ghost"
               size="sm"
               onClick={() => setAutoScroll((v) => !v)}
-              icon={autoScroll ? <Pause size={14} /> : <Play size={14} />}
+              iconLeft={autoScroll ? <Pause size={14} /> : <Play size={14} />}
             >
               {autoScroll ? 'Auto-scroll On' : 'Auto-scroll Off'}
             </Button>
@@ -109,7 +109,7 @@ export default function LogsPage() {
               variant="outline"
               size="sm"
               onClick={handleExport}
-              icon={<Download size={14} />}
+              iconLeft={<Download size={14} />}
               disabled={displayedLogs.length === 0}
             >
               Export
@@ -118,7 +118,7 @@ export default function LogsPage() {
               variant="outline"
               size="sm"
               onClick={() => void refetch()}
-              icon={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
+              iconLeft={<RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />}
             >
               Refresh
             </Button>

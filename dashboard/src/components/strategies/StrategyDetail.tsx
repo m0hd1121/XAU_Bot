@@ -523,7 +523,7 @@ export function StrategyDetail({
   }
 
   return (
-    <Modal open={open} onClose={onClose} maxWidth="2xl">
+    <Modal open={open} onClose={onClose} size="xl">
       <div className="bg-zinc-950 rounded-xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="bg-zinc-900 border-b border-zinc-800 px-5 py-4">

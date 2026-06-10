@@ -256,7 +256,7 @@ function FundamentalCard({ fundamental }: { fundamental: Record<string, unknown>
                           {formatUnixTime(evTime)}
                         </span>
                       )}
-                      {ev.currency && (
+                      {Boolean(ev.currency) && (
                         <span className="text-[10px] text-zinc-600">{ev.currency as string}</span>
                       )}
                     </div>

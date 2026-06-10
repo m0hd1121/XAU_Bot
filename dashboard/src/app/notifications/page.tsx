@@ -260,7 +260,7 @@ export default function NotificationsPage() {
             variant="outline"
             size="sm"
             onClick={handleMarkAllRead}
-            icon={<RefreshCw size={14} />}
+            iconLeft={<RefreshCw size={14} />}
           >
             Mark all read
           </Button>
