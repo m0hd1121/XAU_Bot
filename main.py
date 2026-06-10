@@ -322,9 +322,10 @@ def run_paper(cfg: dict) -> None:
             import zoneinfo as _zi
             _uae = _zi.ZoneInfo("Asia/Dubai")
             _now_uae = datetime.now(_tz.utc).astimezone(_uae).strftime("%Y-%m-%d %H:%M UAE")
+            _bias = htf_bias.get(str(last_bar_time)[:bias_key_len], "unknown")
             logger.info(
-                "Heartbeat [%s] — equity $%.2f | open trades: %d | last bar: %s",
-                _now_uae, risk.equity, len(open_trades), last_bar_time,
+                "Heartbeat [%s] — bias=%s | equity $%.2f | open trades: %d | last bar: %s",
+                _now_uae, _bias, risk.equity, len(open_trades), last_bar_time,
             )
 
         if tick % poll_ticks != 0:
@@ -427,7 +428,11 @@ def run_paper(cfg: dict) -> None:
                                         trade.entry_price, trade.sl_price,
                                         trade.tp1_price, trade.tp2_price)
                     else:
-                        logger.debug("Trade blocked by risk: %s", risk_report.reason)
+                        logger.info("Setup found but BLOCKED — %s @ %.2f  quality=%.2f  reason: %s",
+                                    setup.direction.value, setup.entry_price,
+                                    setup.quality_score, risk_report.reason)
+                else:
+                    logger.debug("No setup at %s — trend=%s", bar_ts, strategy.htf_bias)
 
                 last_bar_time = bar_ts
                 _write_status()
@@ -593,16 +598,17 @@ def run_live(cfg: dict) -> None:
             import zoneinfo as _zi
             _uae = _zi.ZoneInfo("Asia/Dubai")
             _now_uae = datetime.now(_tz.utc).astimezone(_uae).strftime("%Y-%m-%d %H:%M UAE")
+            _bias = htf_bias.get(str(last_bar_time)[:bias_key_len], "unknown")
             try:
                 acct = broker.get_account_info()
                 logger.info(
-                    "Heartbeat [%s] — equity $%.2f | open trades: %d | last bar: %s",
-                    _now_uae, acct.get("equity", 0), len(open_trades), last_bar_time,
+                    "Heartbeat [%s] — bias=%s | equity $%.2f | open trades: %d | last bar: %s",
+                    _now_uae, _bias, acct.get("equity", 0), len(open_trades), last_bar_time,
                 )
             except Exception as exc:
                 logger.info(
-                    "Heartbeat [%s] — open trades: %d | last bar: %s | broker: %s",
-                    _now_uae, len(open_trades), last_bar_time, exc,
+                    "Heartbeat [%s] — bias=%s | open trades: %d | last bar: %s | broker: %s",
+                    _now_uae, _bias, len(open_trades), last_bar_time, exc,
                 )
 
         if tick % poll_ticks != 0:
@@ -700,6 +706,12 @@ def run_live(cfg: dict) -> None:
                             except Exception as exc:
                                 logger.error("Failed to place broker order: %s", exc)
                             open_trades.append(trade)
+                    else:
+                        logger.info("Setup found but BLOCKED — %s @ %.2f  quality=%.2f  reason: %s",
+                                    setup.direction.value, setup.entry_price,
+                                    setup.quality_score, risk_report.reason)
+                else:
+                    logger.debug("No setup at %s — trend=%s", bar_ts, strategy.htf_bias)
 
                 last_bar_time = bar_ts
                 _write_status()
