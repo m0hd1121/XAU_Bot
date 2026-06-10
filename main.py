@@ -94,13 +94,13 @@ def run_backtest(cfg: dict) -> None:
     logging.getLogger(__name__).info("Metrics saved to reports/metrics.json")
 
 
-def _fetch_ohlc(yf_symbol: str, period: str) -> "pd.DataFrame | None":
+def _fetch_ohlc(yf_symbol: str, period: str, interval: str = "1h") -> "pd.DataFrame | None":
     """Download OHLC bars from Yahoo Finance, returning UTC-naive DataFrame."""
     try:
         import yfinance as yf
         import pandas as pd
         ticker = yf.Ticker(yf_symbol)
-        raw = ticker.history(period=period, interval="1h", auto_adjust=True)
+        raw = ticker.history(period=period, interval=interval, auto_adjust=True)
         if raw is None or raw.empty:
             return None
         raw.columns = [c.lower() for c in raw.columns]
@@ -114,12 +114,38 @@ def _fetch_ohlc(yf_symbol: str, period: str) -> "pd.DataFrame | None":
         return None
 
 
+def _yf_params(cfg: dict) -> tuple:
+    """Return (yf_interval, warmup_period, fresh_period, poll_ticks, bias_key_len).
+
+    poll_ticks: how many 30-second ticks between bar-fetch calls.
+    bias_key_len: chars of ISO timestamp used as HTF bias map key.
+    """
+    tf = cfg.get("bot", {}).get("timeframe", "1H").upper().replace("MIN", "M")
+    if tf in ("1M", "2M", "5M"):
+        # Yahoo Finance: 5m data available up to 60 days
+        return ("5m", "60d", "2d", 2, 13)   # poll every 1 min, hour-level bias key
+    elif tf in ("15M", "30M"):
+        return ("15m", "60d", "5d", 2, 13)
+    else:
+        return ("1h", "90d", "5d", 4, 10)   # poll every 2 min, date-level bias key
+
+
 def _htf_bias_for_df(df: "pd.DataFrame", cfg: dict) -> dict:
-    """Resample 1H DataFrame to 4H and return date→Trend bias map."""
+    """Resample primary-TF DataFrame to HTF and return timestamp→Trend bias map."""
     try:
         from xau_bot.market_structure_engine import MarketStructureEngine, Trend
         import pandas as pd
-        htf = df[["open", "high", "low", "close"]].resample("4h").agg(
+
+        htf_tf = cfg.get("bot", {}).get("htf_timeframe", "4H").upper()
+        _resample_map = {
+            "1H": "1h", "4H": "4h", "1D": "1D",
+            "15M": "15min", "30M": "30min",
+        }
+        resample_str = _resample_map.get(htf_tf, "4h")
+        # Use hour-level key (13 chars) for HTF ≤ 1H, date-level (10 chars) otherwise
+        key_len = 13 if htf_tf in ("1H", "15M", "30M") else 10
+
+        htf = df[["open", "high", "low", "close"]].resample(resample_str).agg(
             {"open": "first", "high": "max", "low": "min", "close": "last"}
         ).dropna()
         if len(htf) < 10:
@@ -129,7 +155,7 @@ def _htf_bias_for_df(df: "pd.DataFrame", cfg: dict) -> dict:
         bias_map: dict = {}
         for j in range(len(htf)):
             engine.update(htf, j)
-            bias_map[str(htf.index[j])[:10]] = engine.get_trend()
+            bias_map[str(htf.index[j])[:key_len]] = engine.get_trend()
         return bias_map
     except Exception as exc:
         logging.getLogger(__name__).warning("HTF bias computation failed: %s", exc)
@@ -191,6 +217,7 @@ def run_paper(cfg: dict) -> None:
         logger.info("Starting fresh with $%.2f", initial_capital)
 
     yf_symbol = "GC=F"   # Gold Futures — closest proxy for XAUUSD on Yahoo Finance
+    yf_interval, warmup_period, fresh_period, poll_ticks, bias_key_len = _yf_params(cfg)
 
     # ── Status writer ────────────────────────────────────────────────────────
     open_trades: list = []    # list[ActiveTrade]
@@ -246,12 +273,14 @@ def run_paper(cfg: dict) -> None:
             logger.warning("Status write failed (non-fatal): %s", exc)
 
     # ── Download warmup data ─────────────────────────────────────────────────
-    logger.info("Downloading 90 days of hourly bars from Yahoo Finance (%s)…", yf_symbol)
-    raw_df = _fetch_ohlc(yf_symbol, "90d")
+    logger.info(
+        "Downloading %s of %s bars from Yahoo Finance (%s)…",
+        warmup_period, yf_interval, yf_symbol,
+    )
+    raw_df = _fetch_ohlc(yf_symbol, warmup_period, yf_interval)
     if raw_df is None or raw_df.empty:
         logger.error("Failed to download warmup data — check network or yfinance install")
         _write_status()
-        # Keep process alive so the API shows 'Running' even without data
         while _alive[0]:
             time.sleep(10)
             _write_status()
@@ -270,7 +299,7 @@ def run_paper(cfg: dict) -> None:
     htf_bias = _htf_bias_for_df(df, cfg)
 
     for i in range(len(df)):
-        ts_key = str(df.index[i])[:10]
+        ts_key = str(df.index[i])[:bias_key_len]
         strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
         ms_engine.update(df, i)
 
@@ -280,7 +309,7 @@ def run_paper(cfg: dict) -> None:
 
     _write_status()
 
-    # ── Main loop — check for new bars every 60 s ────────────────────────────
+    # ── Main loop ────────────────────────────────────────────────────────────
     tick = 0
     while _alive[0]:
         time.sleep(30)
@@ -298,12 +327,11 @@ def run_paper(cfg: dict) -> None:
                 _now_uae, risk.equity, len(open_trades), last_bar_time,
             )
 
-        # Poll for new bars every ~2 minutes
-        if tick % 4 != 0:
+        if tick % poll_ticks != 0:
             continue
 
         try:
-            fresh = _fetch_ohlc(yf_symbol, "5d")
+            fresh = _fetch_ohlc(yf_symbol, fresh_period, yf_interval)
             if fresh is None or fresh.empty:
                 continue
 
@@ -332,8 +360,8 @@ def run_paper(cfg: dict) -> None:
                 i = len(df) - 1
                 last_price[0] = float(df["close"].values[-1])
 
-                # Update HTF bias daily
-                ts_key = str(bar_ts)[:10]
+                # Update HTF bias when the hour changes
+                ts_key = str(bar_ts)[:bias_key_len]
                 if ts_key not in htf_bias:
                     htf_bias = _htf_bias_for_df(df, cfg)
                 strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
@@ -492,6 +520,7 @@ def run_live(cfg: dict) -> None:
         logger.warning("Could not sync equity from broker: %s", exc)
 
     yf_symbol = "GC=F"
+    yf_interval, warmup_period, fresh_period, poll_ticks, bias_key_len = _yf_params(cfg)
     open_trades: list = []
     last_price: list  = [0.0]
     broker_orders: dict = {}  # trade_id → broker order_id
@@ -515,8 +544,11 @@ def run_live(cfg: dict) -> None:
         except Exception as exc:
             logger.warning("Status write failed: %s", exc)
 
-    logger.info("Downloading warmup data…")
-    raw_df = _fetch_ohlc(yf_symbol, "90d")
+    logger.info(
+        "Downloading %s of %s bars from Yahoo Finance (%s)…",
+        warmup_period, yf_interval, yf_symbol,
+    )
+    raw_df = _fetch_ohlc(yf_symbol, warmup_period, yf_interval)
     if raw_df is None or raw_df.empty:
         logger.error("Failed to download warmup data")
         while _alive[0]:
@@ -538,7 +570,7 @@ def run_live(cfg: dict) -> None:
 
     try:
         for i in range(len(df)):
-            ts_key = str(df.index[i])[:10]
+            ts_key = str(df.index[i])[:bias_key_len]
             strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
             ms_engine.update(df, i)
     except Exception as exc:
@@ -573,11 +605,11 @@ def run_live(cfg: dict) -> None:
                     _now_uae, len(open_trades), last_bar_time, exc,
                 )
 
-        if tick % 4 != 0:
+        if tick % poll_ticks != 0:
             continue
 
         try:
-            fresh = _fetch_ohlc(yf_symbol, "5d")
+            fresh = _fetch_ohlc(yf_symbol, fresh_period, yf_interval)
             if fresh is None or fresh.empty:
                 continue
 
@@ -600,7 +632,7 @@ def run_live(cfg: dict) -> None:
                 i      = len(df) - 1
                 last_price[0] = float(df["close"].values[-1])
 
-                ts_key = str(bar_ts)[:10]
+                ts_key = str(bar_ts)[:bias_key_len]
                 if ts_key not in htf_bias:
                     htf_bias = _htf_bias_for_df(df, cfg)
                 strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
