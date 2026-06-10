@@ -995,8 +995,8 @@ export default function Agent2Page() {
 
         <Tabs
           tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          active={activeTab}
+          onChange={setActiveTab}
         />
 
         <div>

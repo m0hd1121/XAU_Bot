@@ -630,8 +630,8 @@ export default function Agent1Page() {
 
         <Tabs
           tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          active={activeTab}
+          onChange={setActiveTab}
         />
 
         <div>
