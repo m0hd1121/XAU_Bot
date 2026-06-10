@@ -97,26 +97,26 @@ function StatsRow({
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <MetricTile
         label="Total Decisions"
-        value={loading ? null : String(total)}
+        value={loading ? '—' : String(total)}
         loading={loading}
       />
       <MetricTile
         label="Executed"
-        value={loading ? null : `${executed}`}
+        value={loading ? '—' : `${executed}`}
         sub={loading ? undefined : `${execPct}%`}
         loading={loading}
         valueClassName="text-emerald-400"
       />
       <MetricTile
         label="Rejected"
-        value={loading ? null : `${rejected}`}
+        value={loading ? '—' : `${rejected}`}
         sub={loading ? undefined : `${rejPct}%`}
         loading={loading}
         valueClassName="text-red-400"
       />
       <MetricTile
         label="Deferred"
-        value={loading ? null : `${deferred}`}
+        value={loading ? '—' : `${deferred}`}
         sub={loading ? undefined : `${defPct}%`}
         loading={loading}
         valueClassName="text-amber-400"
