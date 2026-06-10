@@ -52,10 +52,11 @@ export function useDashboard(): UseQueryResult<DashboardSnapshot> {
   })
 }
 
-export function useAllAgents(): UseQueryResult<Record<string, AgentState>> {
+export function useAllAgents(): UseQueryResult<AgentState[]> {
   return useQuery({
     queryKey: QUERY_KEYS.allAgents,
     queryFn: () => apiClient.getAllAgentStatus(),
+    select: (data) => Object.values(data),
     refetchInterval: 30_000,
     staleTime: 20_000,
   })

@@ -5,7 +5,7 @@ import { useAllAgents, useControlAgent } from './useApi'
 import type { AgentId, AgentState } from '@/types'
 
 interface UseAgentsReturn {
-  agents: Record<string, AgentState>
+  agents: AgentState[]
   loading: boolean
   error: Error | null
   pauseAgent: (id: AgentId) => Promise<void>
@@ -50,7 +50,7 @@ export function useAgents(): UseAgentsReturn {
   )
 
   return {
-    agents: agents ?? {},
+    agents: agents ?? [],
     loading,
     error: error as Error | null,
     pauseAgent,
