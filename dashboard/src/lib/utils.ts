@@ -13,9 +13,10 @@ export function cn(...inputs: ClassValue[]): string {
  * Format a number as USD currency.
  */
 export function formatCurrency(
-  value: number,
+  value: number | null | undefined,
   options?: Intl.NumberFormatOptions,
 ): string {
+  if (value == null || !Number.isFinite(value)) return '—'
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -75,8 +76,8 @@ export function formatISOTimestamp(iso: string): string {
 /**
  * Format seconds into a human-readable duration string (e.g. "2h 34m 12s").
  */
-export function formatDuration(seconds: number): string {
-  if (seconds < 0) return '—'
+export function formatDuration(seconds: number | null | undefined): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return '—'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
