@@ -5,15 +5,15 @@
 bot:
   name: "XAU_PriceAction_Bot"
   version: "1.0.0"
-  mode: "live"               # "backtest" | "paper" | "live"
-  symbol: "XAUUSD!"          # OpoFinance symbol name
+  mode: "${BOT_MODE:-live}"               # "backtest" | "paper" | "live"
+  symbol: "${BOT_SYMBOL:-XAUUSD!}"        # OpoFinance symbol name
   timeframe: "5M"           # Primary timeframe for structure analysis
   htf_timeframe: "1H"       # Higher timeframe for bias
 
 # ── Data ─────────────────────────────────────────────────────
 data:
   source: "csv"             # "csv" | "mt5" | "rest"
-  csv_path: "data/XAUUSD_H1.csv"
+  csv_path: "${DATA_DIR:-data}/XAUUSD_5M.csv"
   date_column: "time"
   date_format: "%Y-%m-%d %H:%M:%S"
   # REST API settings (when source = "rest")
@@ -109,12 +109,12 @@ backtest:
   fill_model: "next_open"          # "next_open" | "current_close" | "touch"
   log_trades: true
   save_equity_curve: true
-  output_dir: "reports"
+  output_dir: "${REPORTS_DIR:-reports}"
 
 # ── Self-Learning Engine ─────────────────────────────────────
 learning:
   enabled: false                    # Set true to activate the learning layer
-  db_path: "data/learning.db"      # SQLite database for trade history
+  db_path: "${DATA_DIR:-data}/learning.db"      # SQLite database for trade history
   analysis_every_n_trades: 50      # Run full pattern analysis every N trades
   min_trades_before_update: 30     # Don't apply learned filters until N trades
   adaptive_threshold: true         # Use learned confidence as an entry filter
@@ -133,12 +133,12 @@ learning:
 
 # ── Broker Connection ────────────────────────────────────────
 broker:
-  type: "dwx"                 # "paper" | "dwx" | "metaapi" | "oanda"
+  type: "${BROKER_TYPE:-dwx}"        # "paper" | "dwx" | "metaapi" | "oanda"
 
   # XAU_Bridge EA file bridge — MT5 running under Wine on this VPS
   dwx:
-    mt4_files_path: "/home/botuser/.wine-mt4/drive_c/Program Files/MetaTrader 5/MQL5/Files"
-    magic: 88888              # Magic number for bot orders
+    mt4_files_path: "${MT5_FILES_PATH:-/home/botuser/.wine-mt4/drive_c/Program Files/MetaTrader 5/MQL5/Files}"
+    magic: ${DWX_MAGIC:-88888}        # Magic number for bot orders
 
   # MetaApi cloud MT5/MT4 bridge — works from Linux VPS
   # Sign up free at https://metaapi.cloud, add your MT5 account,
@@ -157,5 +157,5 @@ broker:
 logging:
   level: "INFO"                    # DEBUG | INFO | WARNING | ERROR
   log_to_file: true
-  log_file: "logs/xau_bot.log"
-  log_trades_file: "logs/trades.csv"
+  log_file: "${LOGS_DIR:-logs}/xau_bot.log"
+  log_trades_file: "${LOGS_DIR:-logs}/trades.csv"

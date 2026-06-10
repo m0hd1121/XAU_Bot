@@ -1,0 +1,101 @@
+version: "3.9"
+
+# =============================================================
+# docker-compose.yml — XAU/USD Price Action Trading Bot
+#
+# Usage:
+#   docker compose up -d           # Start in background
+#   docker compose logs -f         # Follow logs
+#   docker compose down            # Stop and remove containers
+#   docker compose pull && \
+#     docker compose up -d         # Update and restart
+#
+# Prerequisites:
+#   - Copy .env.example to .env and fill in your values
+#   - SSL certificates must be present on the host for API TLS
+# =============================================================
+
+services:
+  # ── Main trading bot ──────────────────────────────────────────
+  xaubot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: xaubot:latest
+    container_name: xaubot
+
+    # Load all environment variables from .env file
+    env_file:
+      - .env
+
+    # Port mappings — values come from .env (with defaults)
+    ports:
+      - "${API_PORT:-8443}:${API_PORT:-8443}"   # FastAPI HTTPS backend
+      - "${UI_PORT:-8502}:${UI_PORT:-8502}"     # Streamlit UI
+
+    # Persistent data volumes
+    volumes:
+      # Bot data (SQLite, JSON snapshots, CSV price data)
+      - ./data:/app/data
+      # Log files
+      - ./logs:/app/logs
+      # Backtest reports
+      - ./reports:/app/reports
+      # Backup archives
+      - ./backups:/app/backups
+      # Mount SSL certificates (read-only) for the API
+      # The path comes from .env; falls back to Let's Encrypt default
+      - ${SSL_CERT_DIR:-/etc/letsencrypt/live/xaubot.aswaqalseyouh.ae}:/app/ssl:ro
+      # Mount MT5 files directory for DWX bridge (read-write)
+      # Allows the bot to read account/trade JSON files from MT5
+      - ${MT5_FILES_PATH:-/home/botuser/.wine-mt4/drive_c/Program Files/MetaTrader 5/MQL5/Files}:/app/mt5files
+
+    # Restart policy — restart unless explicitly stopped
+    restart: unless-stopped
+
+    # Resource limits (adjust for your VPS)
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+    # Health check — polls the FastAPI /health endpoint
+    healthcheck:
+      test:
+        - "CMD"
+        - "curl"
+        - "-fsk"
+        - "https://localhost:${API_PORT:-8443}/health"
+      interval: 60s
+      timeout: 10s
+      start_period: 45s
+      retries: 3
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+    # Human-readable labels
+    labels:
+      com.xaubot.description: "XAU/USD Price Action Trading Bot"
+      com.xaubot.component: "main"
+
+# =============================================================
+# Named volumes (declared but using bind mounts above for easy
+# access to data from the host without docker volume commands).
+# If you prefer docker-managed volumes, replace the bind mounts
+# above with these names.
+# =============================================================
+# volumes:
+#   xaubot_data:
+#   xaubot_logs:
+#   xaubot_reports:
+#   xaubot_backups:

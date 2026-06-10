@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -42,9 +43,30 @@ def setup_logging(cfg: dict) -> None:
     )
 
 
+def _expand_env_vars(raw: str) -> str:
+    """Replace ${VAR_NAME} and ${VAR_NAME:-default} patterns with env var values.
+
+    Examples:
+        ${BOT_MODE}              → os.environ['BOT_MODE'] (or '' if unset)
+        ${BOT_MODE:-live}        → os.environ.get('BOT_MODE', 'live')
+        ${DATA_DIR:-data}        → os.environ.get('DATA_DIR', 'data')
+    """
+    def _replace(match: re.Match) -> str:
+        inner = match.group(1)
+        if ":-" in inner:
+            var_name, _, default_val = inner.partition(":-")
+            return os.environ.get(var_name.strip(), default_val)
+        else:
+            return os.environ.get(inner.strip(), "")
+
+    return re.sub(r"\$\{([^}]+)\}", _replace, raw)
+
+
 def load_config(path: str) -> dict:
     with open(path, "r") as f:
-        return yaml.safe_load(f)
+        raw = f.read()
+    expanded = _expand_env_vars(raw)
+    return yaml.safe_load(expanded)
 
 
 def parse_args() -> argparse.Namespace:

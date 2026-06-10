@@ -1,0 +1,94 @@
+# =============================================================
+# .dockerignore — Files excluded from the Docker build context
+# =============================================================
+
+# Git metadata
+.git
+.gitignore
+.gitattributes
+
+# Sensitive environment files (injected at runtime via --env-file)
+.env
+.env.local
+.env.*.local
+
+# Python cache and compiled bytecode
+__pycache__
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Node.js (not used but guard against accidental inclusion)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Data directories — these are bind-mounted at runtime
+data/
+logs/
+reports/
+backups/
+
+# Log files anywhere in the tree
+*.log
+*.log.*
+
+# Temporary and editor files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE configuration
+.idea/
+.vscode/
+*.code-workspace
+
+# Documentation source (not needed at runtime)
+docs/
+*.md
+
+# Test files (not needed in production image)
+tests/
+test_*.py
+*_test.py
+pytest.ini
+setup.cfg
+tox.ini
+.flake8
+.pylintrc
+pyproject.toml
+
+# CI/CD configs
+.github/
+.circleci/
+.travis.yml
+Dockerfile*
+docker-compose*.yml
+
+# Backup archives
+*.tar.gz
+*.tar.bz2
+*.zip
+
+# iOS / mobile (sub-directory in project)
+iOS/
+
+# Scripts not needed inside container
+# (keep scripts/ for validate/backup, but exclude heavy ones)
+scripts/install_mt4_wine.sh
