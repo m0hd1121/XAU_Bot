@@ -394,12 +394,7 @@ export default function ActivityPage() {
         <PageHeader
           title="Activity Monitor"
           subtitle="Real-time events from all three agents"
-          badge={
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live
-            </span>
-          }
+          badge={{ text: 'Live', variant: 'success' }}
         />
 
         {/* Sticky filter bar */}

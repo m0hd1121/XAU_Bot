@@ -83,3 +83,5 @@ interface CardContentProps {
 export function CardContent({ children, className }: CardContentProps) {
   return <div className={cn('px-5 py-4', className)}>{children}</div>
 }
+
+export { Card }
