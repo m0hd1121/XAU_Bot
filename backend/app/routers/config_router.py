@@ -115,6 +115,11 @@ class ConfigUpdateResponse(BaseModel):
     message: str = ""
 
 
+class FieldUpdateRequest(BaseModel):
+    path: str
+    value: Any
+
+
 # ── Validation ────────────────────────────────────────────────────────────────
 
 def _validate_section(section: str, values: dict) -> list[str]:
@@ -391,6 +396,45 @@ async def update_section(
             else "Configuration saved. Bot will apply changes on the next bar."
         ),
     )
+
+
+@router.put("/field", summary="Update a single config field by dotted path")
+async def update_field(
+    req: FieldUpdateRequest,
+    _user=Depends(require_admin),
+) -> dict:
+    """
+    Accepts a dotted-notation path (e.g. 'bot.mode', 'agents.agent1.population_size')
+    and writes the value directly into config.yaml without section whitelisting.
+    The path must have at least two segments.
+    """
+    parts = req.path.split(".")
+    if len(parts) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="path must have at least 2 segments (e.g. 'bot.mode')",
+        )
+
+    cfg = bot_service.read_config()
+
+    # Navigate to the parent container and set the leaf key
+    node = cfg
+    for part in parts[:-1]:
+        if part not in node or not isinstance(node[part], dict):
+            node[part] = {}
+        node = node[part]
+
+    node[parts[-1]] = req.value
+    bot_service.write_config(cfg)
+
+    logger.info("Config field updated path=%s value=%r", req.path, req.value)
+    section = parts[0]
+    return {
+        "ok": True,
+        "path": req.path,
+        "value": req.value,
+        "restart_required": section in _RESTART_REQUIRED,
+    }
 
 
 @router.post("/reload", summary="Signal bot to reload configuration")
