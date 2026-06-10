@@ -348,13 +348,13 @@ export default function AgentsPage() {
   const anyRunning = agents.some((a) => a.status === 'running' || a.status === 'paused')
 
   function handleControl(agentId: string, cmd: 'pause' | 'resume' | 'stop' | 'restart') {
-    controlAgent({ agentId, command: cmd })
+    controlAgent({ id: agentId as AgentId, command: cmd })
   }
 
   async function handleStartAll() {
     for (const a of agents) {
       if (a.status === 'stopped' || a.status === 'error') {
-        controlAgent({ agentId: a.agent_id, command: 'resume' })
+        controlAgent({ id: a.agent_id as AgentId, command: 'resume' })
         await new Promise((r) => setTimeout(r, 500))
       }
     }
@@ -363,7 +363,7 @@ export default function AgentsPage() {
   async function handleStopAll() {
     for (const a of agents) {
       if (a.status === 'running' || a.status === 'paused') {
-        controlAgent({ agentId: a.agent_id, command: 'stop' })
+        controlAgent({ id: a.agent_id as AgentId, command: 'stop' })
         await new Promise((r) => setTimeout(r, 300))
       }
     }
