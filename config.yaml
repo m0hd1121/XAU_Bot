@@ -5,7 +5,7 @@
 bot:
   name: "XAU_PriceAction_Bot"
   version: "1.0.0"
-  mode: "paper"             # "backtest" | "paper" | "live"
+  mode: "live"               # "backtest" | "paper" | "live"
   symbol: "XAUUSD"
   timeframe: "5M"           # Primary timeframe for structure analysis
   htf_timeframe: "1H"       # Higher timeframe for bias
@@ -133,12 +133,11 @@ learning:
 
 # ── Broker Connection ────────────────────────────────────────
 broker:
-  type: "paper"               # "paper" | "dwx" | "metaapi" | "oanda"
+  type: "dwx"                 # "paper" | "dwx" | "metaapi" | "oanda"
 
-  # DWX Connect — MT4 running under Wine on this VPS
-  # Set mt4_files_path to your MT4 MQL4/Files directory
+  # XAU_Bridge EA file bridge — MT5 running under Wine on this VPS
   dwx:
-    mt4_files_path: "~/.wine-mt4/drive_c/Program Files (x86)/OpoFinance MT4 Terminal/MQL4/Files"
+    mt4_files_path: "/home/botuser/.wine-mt4/drive_c/Program Files/MetaTrader 5/MQL5/Files"
     magic: 88888              # Magic number for bot orders
 
   # MetaApi cloud MT5/MT4 bridge — works from Linux VPS
