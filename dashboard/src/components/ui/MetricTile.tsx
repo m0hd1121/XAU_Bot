@@ -117,3 +117,5 @@ export default function MetricTile({
     </div>
   )
 }
+
+export { MetricTile }

@@ -127,3 +127,5 @@ export default function Modal({
   if (typeof document === 'undefined') return null
   return createPortal(content, document.body)
 }
+
+export { Modal }

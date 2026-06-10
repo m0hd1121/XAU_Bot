@@ -87,3 +87,5 @@ export default function ProgressBar({
     </div>
   )
 }
+
+export { ProgressBar }

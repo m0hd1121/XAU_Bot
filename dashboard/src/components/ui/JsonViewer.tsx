@@ -168,3 +168,5 @@ export default function JsonViewer({
     </div>
   )
 }
+
+export { JsonViewer }
