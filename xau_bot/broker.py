@@ -137,7 +137,7 @@ class DWXBroker(BrokerBase):
         self._cmd_id += 1
         payload["_magic"] = self._magic
         cmd_file = self._f(self._ORDERS_FILE)
-        cmd_file.write_text(json.dumps(payload))
+        cmd_file.write_text(json.dumps(payload, separators=(',', ':')))
 
         # Wait for EA to consume the file (it deletes or empties it when done)
         deadline = time.time() + timeout
