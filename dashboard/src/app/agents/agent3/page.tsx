@@ -1474,30 +1474,17 @@ export default function Agent3Page() {
           title="Agent 3 — Live Trader"
           subtitle="Manages trade execution, position sizing, and real-time risk management"
           badge={
-            agentState && (
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border',
-                  agentState.status === 'running'
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    : agentState.status === 'paused'
-                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    : 'bg-red-500/10 text-red-400 border-red-500/20'
-                )}
-              >
-                <span
-                  className={cn(
-                    'w-1.5 h-1.5 rounded-full',
+            agentState
+              ? {
+                  text: agentState.status.charAt(0).toUpperCase() + agentState.status.slice(1),
+                  variant:
                     agentState.status === 'running'
-                      ? 'bg-emerald-400 animate-pulse'
+                      ? 'success'
                       : agentState.status === 'paused'
-                      ? 'bg-amber-400'
-                      : 'bg-red-400'
-                  )}
-                />
-                {agentState.status.charAt(0).toUpperCase() + agentState.status.slice(1)}
-              </span>
-            )
+                      ? 'warning'
+                      : 'danger',
+                }
+              : undefined
           }
         />
 
