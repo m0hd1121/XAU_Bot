@@ -71,7 +71,7 @@ class WSClient {
       .replace(/^http:\/\//, 'ws://')
       .replace(/\/$/, '')
 
-    const url = `${wsBase}/api/v1/ws/live`
+    const url = `${wsBase}/api/v1/ws/dashboard`
 
     try {
       this.socket = new WebSocket(url)
