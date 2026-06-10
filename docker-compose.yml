@@ -193,6 +193,37 @@ services:
       com.xaubot.description: "Agent 3: Live Trader & Risk Manager"
       com.xaubot.component: "agent3"
 
+  # ── Next.js Control Center Dashboard ────────────────────────────────────────
+  xaubot-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: xaubot-dashboard
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${API_URL:-https://localhost:8443}
+      - NODE_ENV=production
+    depends_on:
+      - xaubot
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.xaubot.description: "Next.js Control Center Dashboard"
+      com.xaubot.component: "dashboard"
+
 # =============================================================
 # Named volumes (declared but using bind mounts above for easy
 # access to data from the host without docker volume commands).

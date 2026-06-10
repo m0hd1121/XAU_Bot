@@ -22,8 +22,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Start the FastAPI control backend
 cd backend && ../.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8443
 
-# Start the Streamlit UI
+# Start the Streamlit UI (legacy)
 .venv/bin/streamlit run ui/app.py --server.port 8502
+
+# Start the Next.js Control Center dashboard (development)
+cd dashboard && npm run dev                    # http://localhost:3000
+
+# Start the Next.js Control Center dashboard (production)
+cd dashboard && npm ci && npm run build && npm start
 
 # Start everything (used in production via systemd)
 bash scripts/start_all.sh
@@ -200,6 +206,60 @@ Key config sections and gotchas:
 - `market_structure.swing_lookback: 3` is tuned for 5M; increase to 5+ for 1H
 - `broker.dwx.mt4_files_path` must exactly match the MQL5/Files path inside the Wine prefix
 - `broker.dwx.magic` must match the Magic Number in the EA's MT5 input settings
+
+## Next.js Control Center Dashboard (`dashboard/`)
+
+Institutional-grade control center built with Next.js 15, TypeScript, Tailwind CSS 3.4, TanStack Query 5, and Recharts. Replaces the Streamlit UI as the primary web interface.
+
+### Stack
+
+- **Framework**: Next.js 15 App Router, all pages `'use client'` (auth requires localStorage)
+- **State**: TanStack Query 5 for server state; Zustand for client state
+- **Charts**: Recharts (AreaChart, LineChart, BarChart, SparkLine)
+- **Theme**: dark zinc-950 base, amber-500 accent, emerald profit, red loss
+- **Auth**: JWT stored in `localStorage` (`xau_access_token` / `xau_refresh_token`)
+- **WebSocket**: auto-reconnect client in `src/lib/ws.ts`; context in `WebSocketContext`
+- **Icons**: Lucide React; `cn()` = clsx + tailwind-merge
+
+### Pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/dashboard` | Global Dashboard | Live P&L, equity curve, agent health, open trades |
+| `/agents` | Agents Overview | All-agent status grid |
+| `/agents/agent1` | Agent 1 — Research | Population metrics, genome evolution, fitness charts |
+| `/agents/agent2` | Agent 2 — Intelligence | Regime detection, economic calendar, risk score |
+| `/agents/agent3` | Agent 3 — Trader | Live trades, decision feed, execution controls |
+| `/strategies` | Strategy Explorer | Generate/validate/promote/reject strategy candidates |
+| `/explainability` | Explainability Center | Every trade decision fully inspectable |
+| `/activity` | Activity Monitor | Unified real-time agent event feed |
+| `/config` | Configuration Center | Every platform parameter editable from UI |
+| `/logs` | Logs Center | All log types with type/level/search filters, export |
+| `/notifications` | Notifications Center | System alerts with preferences and thresholds |
+
+### Key files
+
+- `src/lib/api.ts` — `ApiClient` singleton; JWT auto-refresh on 401; fires `auth:expired` event on failure
+- `src/lib/ws.ts` — `WSClient` class; exponential backoff reconnect; typed message handlers
+- `src/types/index.ts` — all shared TypeScript interfaces (AgentState, StrategyCandidate, MarketIntel, etc.)
+- `src/hooks/useApi.ts` — all TanStack Query hooks (data fetching + mutations)
+- `src/contexts/AuthContext.tsx` — login/logout state; redirects to `/login` on `auth:expired`
+- `src/contexts/WebSocketContext.tsx` — wraps `WSClient`; provides `useWebSocket()` hook
+
+### Docker
+
+```bash
+# Build and run the dashboard container
+docker compose up xaubot-dashboard
+
+# Manual build
+cd dashboard && docker build -t xau-dashboard .
+docker run -p 3000:3000 -e NEXT_PUBLIC_API_URL=https://your-vps:8443 xau-dashboard
+```
+
+The `Dockerfile` uses a multi-stage build: builder installs deps + runs `next build` (requires `output: 'standalone'` in `next.config.ts`), runtime copies `.next/standalone` and runs `node server.js`.
+
+Set `NEXT_PUBLIC_API_URL` to the FastAPI backend base URL (default: `http://localhost:8443`). The dashboard talks to `/api/v1/` endpoints and the WebSocket at `/ws/live`.
 
 ## Systemd Service
 

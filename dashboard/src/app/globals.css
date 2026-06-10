@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-zinc-800;
+  }
+
+  body {
+    @apply bg-zinc-950 text-zinc-100 antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-zinc-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-zinc-600;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 #18181b;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-amber-500/30 text-amber-100;
+  }
+}
+
+@layer utilities {
+  .text-profit {
+    @apply text-emerald-400;
+  }
+
+  .text-loss {
+    @apply text-red-400;
+  }
+
+  .text-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      theme(colors.zinc.800) 25%,
+      theme(colors.zinc.700) 50%,
+      theme(colors.zinc.800) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  .glass {
+    @apply bg-zinc-900/80 backdrop-blur-sm;
+  }
+
+  .gradient-border {
+    background: linear-gradient(theme(colors.zinc.900), theme(colors.zinc.900)) padding-box,
+      linear-gradient(135deg, theme(colors.amber.500/30), theme(colors.zinc.700)) border-box;
+    border: 1px solid transparent;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

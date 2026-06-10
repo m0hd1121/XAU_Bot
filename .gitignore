@@ -8,3 +8,6 @@ build/
 .env
 *.log
 logs/
+# Allow dashboard source files even if a parent matches logs/
+!dashboard/src/app/logs/
+!dashboard/src/app/logs/**
