@@ -21,7 +21,7 @@ export interface LineConfig {
 }
 
 interface LineChartProps {
-  data: Array<Record<string, unknown>>
+  data: object[]
   xKey: string
   lines: LineConfig[]
   height?: number

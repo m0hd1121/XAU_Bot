@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 
 interface BarChartProps {
-  data: Array<Record<string, unknown>>
+  data: object[]
   xKey: string
   yKey: string
   color?: string
