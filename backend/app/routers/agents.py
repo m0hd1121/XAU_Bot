@@ -54,7 +54,7 @@ from agents.message_bus import (
     EV_AGENT_STOP,
     EV_AGENT_RESTART,
 )
-from app.auth.security import require_auth
+from app.auth.security import require_admin as require_auth
 from app.config import settings
 
 # ─────────────────────────────────────────────────────────────────────────────
