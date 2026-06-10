@@ -287,11 +287,15 @@ def run_paper(cfg: dict) -> None:
         tick += 1
         _write_status()
 
-        # Heartbeat every 10 minutes
-        if tick % 20 == 0:
+        # Heartbeat every 5 minutes
+        if tick % 10 == 0:
+            from datetime import timezone as _tz
+            import zoneinfo as _zi
+            _uae = _zi.ZoneInfo("Asia/Dubai")
+            _now_uae = datetime.now(_tz.utc).astimezone(_uae).strftime("%Y-%m-%d %H:%M UAE")
             logger.info(
-                "Heartbeat — equity $%.2f | open trades: %d | last bar: %s",
-                risk.equity, len(open_trades), last_bar_time,
+                "Heartbeat [%s] — equity $%.2f | open trades: %d | last bar: %s",
+                _now_uae, risk.equity, len(open_trades), last_bar_time,
             )
 
         # Poll for new bars every ~2 minutes
@@ -551,18 +555,22 @@ def run_live(cfg: dict) -> None:
         tick += 1
         _write_status()
 
-        # Heartbeat every 10 minutes
-        if tick % 20 == 0:
+        # Heartbeat every 5 minutes
+        if tick % 10 == 0:
+            from datetime import timezone as _tz
+            import zoneinfo as _zi
+            _uae = _zi.ZoneInfo("Asia/Dubai")
+            _now_uae = datetime.now(_tz.utc).astimezone(_uae).strftime("%Y-%m-%d %H:%M UAE")
             try:
                 acct = broker.get_account_info()
                 logger.info(
-                    "Heartbeat — equity $%.2f | open trades: %d | last bar: %s",
-                    acct.get("equity", 0), len(open_trades), last_bar_time,
+                    "Heartbeat [%s] — equity $%.2f | open trades: %d | last bar: %s",
+                    _now_uae, acct.get("equity", 0), len(open_trades), last_bar_time,
                 )
             except Exception as exc:
                 logger.info(
-                    "Heartbeat — open trades: %d | last bar: %s | broker: %s",
-                    len(open_trades), last_bar_time, exc,
+                    "Heartbeat [%s] — open trades: %d | last bar: %s | broker: %s",
+                    _now_uae, len(open_trades), last_bar_time, exc,
                 )
 
         if tick % 4 != 0:
