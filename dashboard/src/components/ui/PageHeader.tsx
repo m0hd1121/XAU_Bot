@@ -7,6 +7,7 @@ interface PageHeaderProps {
   subtitle?: string
   actions?: React.ReactNode
   badge?: { text: string; variant: string }
+  icon?: React.ReactNode
   className?: string
 }
 
@@ -15,11 +16,13 @@ export default function PageHeader({
   subtitle,
   actions,
   badge,
+  icon,
   className,
 }: PageHeaderProps) {
   return (
     <div className={cn('flex items-start justify-between gap-4 pb-4 border-b border-zinc-800', className)}>
       <div className="flex items-center gap-3 min-w-0">
+        {icon && <div className="flex-shrink-0">{icon}</div>}
         <div className="min-w-0">
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-semibold text-zinc-100 truncate">{title}</h1>
