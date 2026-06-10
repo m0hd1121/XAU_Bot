@@ -22,6 +22,7 @@ from typing import Optional
 from sqlalchemy import (
     Boolean,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -198,8 +199,8 @@ class BotState(Base):
     last_heartbeat: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_trade_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     open_trades_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    daily_pnl: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
-    equity: Mapped[float] = mapped_column(Integer, nullable=False, default=0)
+    daily_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    equity: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

@@ -28,7 +28,7 @@ UI_PORT="${UI_PORT:-8502}"
 VNC_PORT="${VNC_PORT:-5900}"
 VNC_WEB_PORT="${VNC_WEB_PORT:-6080}"
 
-SSL_DOMAIN="${SSL_DOMAIN:-xaubot.aswaqalseyouh.ae}"
+SSL_DOMAIN="${SSL_DOMAIN:-localhost}"
 SSL_CERT_DIR="${SSL_CERT_DIR:-/etc/letsencrypt/live/${SSL_DOMAIN}}"
 
 VENV_PYTHON="${BOT_DIR}/.venv/bin/python"

@@ -64,6 +64,14 @@ struct LoginResponse: Decodable {
         tokenType    = try c.decodeIfPresent(String.self,  forKey: .tokenType)
         requires2FA  = (try? c.decode(Bool.self, forKey: .requires2FA)) ?? false
     }
+
+    init(accessToken: String? = nil, refreshToken: String? = nil,
+         tokenType: String? = nil, requiresTwoFA: Bool = false) {
+        self.accessToken  = accessToken
+        self.refreshToken = refreshToken
+        self.tokenType    = tokenType
+        self.requires2FA  = requiresTwoFA
+    }
 }
 
 // MARK: - APIClient
@@ -274,8 +282,7 @@ private extension LoginResponse {
     }
 
     static var _empty: LoginResponse {
-        let data = Data(#"{"requires_2fa":true}"#.utf8)
-        return (try? JSONDecoder().decode(LoginResponse.self, from: data))!
+        LoginResponse(requiresTwoFA: true)
     }
 }
 

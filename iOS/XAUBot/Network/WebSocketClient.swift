@@ -116,11 +116,15 @@ final class WebSocketClient: NSObject, ObservableObject {
         }
 
         // Build WebSocket URL  ws:// or wss://
-        var wsURL = base
-        if base.scheme == "https" {
-            wsURL = URL(string: "wss://\(base.host!)\(base.port.map { ":\($0)" } ?? "")/api/v1/ws/dashboard")!
-        } else {
-            wsURL = URL(string: "ws://\(base.host!)\(base.port.map { ":\($0)" } ?? "")/api/v1/ws/dashboard")!
+        guard let host = base.host else {
+            logger.error("Base URL has no host: \(base.absoluteString)")
+            return
+        }
+        let wsScheme = base.scheme == "https" ? "wss" : "ws"
+        let portPart = base.port.map { ":\($0)" } ?? ""
+        guard let wsURL = URL(string: "\(wsScheme)://\(host)\(portPart)/api/v1/ws/dashboard") else {
+            logger.error("Could not construct WebSocket URL from base: \(base.absoluteString)")
+            return
         }
 
         connectionState = reconnectAttempt > 0 ? .reconnecting(attempt: reconnectAttempt) : .connecting
@@ -147,9 +151,17 @@ final class WebSocketClient: NSObject, ObservableObject {
             logger.error("No access token for WebSocket auth")
             return
         }
-        let authPayload = #"{"type":"auth","token":"\#(token)"}"#
+        struct AuthMessage: Encodable {
+            let type = "auth"
+            let token: String
+        }
+        guard let data = try? JSONEncoder().encode(AuthMessage(token: token)),
+              let payload = String(data: data, encoding: .utf8) else {
+            logger.error("Failed to encode WebSocket auth message")
+            return
+        }
         do {
-            try await webSocketTask?.send(.string(authPayload))
+            try await webSocketTask?.send(.string(payload))
             logger.debug("Auth message sent")
         } catch {
             logger.error("Failed to send auth message: \(error)")

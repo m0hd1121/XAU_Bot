@@ -23,7 +23,7 @@
 set -euo pipefail
 
 # ── Constants ────────────────────────────────────────────────────
-GITHUB_REPO="https://github.com/YOUR_ORG/XAU_Bot.git"
+GITHUB_REPO="${GITHUB_REPO:-https://github.com/m0hd1121/xau_bot.git}"
 GIT_BRANCH="claude/xauusd-price-action-bot-T80IJ"
 BOT_USER="${SUDO_USER:-botuser}"
 BOT_DIR="/home/${BOT_USER}/xau_bot"

@@ -69,7 +69,10 @@ class RiskManager:
         self._vol_lookback: int       = rc.get("volatility_lookback", 14)
         self._vol_scale: float        = rc.get("volatility_scale_factor", 1.5)
 
-        self._sl_buffer: float        = cfg.get("strategy", {}).get("sl_buffer_pips", 3.0)
+        sc = cfg.get("strategy", {})
+        self._sl_buffer: float        = sc.get("sl_buffer_pips", 3.0)
+        self._tp1_rr: float           = sc.get("tp1_rr", 2.0)
+        self._tp2_rr: float           = sc.get("tp2_rr", 3.0)
         self._lot_size: float         = ec.get("lot_size", 100)
         self._min_lot: float          = ec.get("min_lot", 0.01)
         self._max_lot: float          = ec.get("max_lot", 10.0)
@@ -146,10 +149,8 @@ class RiskManager:
         buffered_sl_distance = abs(entry_price - buffered_sl)
 
         # ── TP levels (minimum R:R gate) ─────────────────────────────────────
-        tp1_rr = cfg_get_nested_value(2.0, "strategy", "tp1_rr")
-        tp2_rr = cfg_get_nested_value(3.0, "strategy", "tp2_rr")
         tp1_price, tp2_price = self._compute_tp(entry_price, buffered_sl_distance,
-                                                 direction, tp1_rr, tp2_rr)
+                                                 direction, self._tp1_rr, self._tp2_rr)
 
         actual_rr = (abs(tp1_price - entry_price) / (buffered_sl_distance + 1e-10))
         if actual_rr < self._min_rr - 1e-9:
@@ -288,6 +289,3 @@ class RiskManager:
             )
 
 
-def cfg_get_nested_value(default, *keys):
-    """Tiny helper — returns default when cfg isn't threaded through here."""
-    return default
