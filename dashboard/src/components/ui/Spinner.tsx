@@ -1,7 +1,7 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 
-type SpinnerSize = 'sm' | 'md' | 'lg'
+type SpinnerSize = 'xs' | 'sm' | 'md' | 'lg'
 type SpinnerColor = 'default' | 'amber' | 'dark'
 
 interface SpinnerProps {
@@ -11,6 +11,7 @@ interface SpinnerProps {
 }
 
 const sizeClasses: Record<SpinnerSize, string> = {
+  xs: 'w-2.5 h-2.5 border-[1.5px]',
   sm: 'w-3.5 h-3.5 border-[1.5px]',
   md: 'w-5 h-5 border-2',
   lg: 'w-8 h-8 border-[2.5px]',
