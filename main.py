@@ -432,7 +432,7 @@ def run_paper(cfg: dict) -> None:
                                     setup.direction.value, setup.entry_price,
                                     setup.quality_score, risk_report.reason)
                 else:
-                    logger.debug("No setup at %s — trend=%s", bar_ts, strategy.htf_bias)
+                    logger.debug("No setup at %s — trend=%s", bar_ts, strategy._htf_bias)
 
                 last_bar_time = bar_ts
                 _write_status()
@@ -711,7 +711,7 @@ def run_live(cfg: dict) -> None:
                                     setup.direction.value, setup.entry_price,
                                     setup.quality_score, risk_report.reason)
                 else:
-                    logger.debug("No setup at %s — trend=%s", bar_ts, strategy.htf_bias)
+                    logger.debug("No setup at %s — trend=%s", bar_ts, strategy._htf_bias)
 
                 last_bar_time = bar_ts
                 _write_status()
