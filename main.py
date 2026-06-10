@@ -287,6 +287,13 @@ def run_paper(cfg: dict) -> None:
         tick += 1
         _write_status()
 
+        # Heartbeat every 10 minutes
+        if tick % 20 == 0:
+            logger.info(
+                "Heartbeat — equity $%.2f | open trades: %d | last bar: %s",
+                risk.equity, len(open_trades), last_bar_time,
+            )
+
         # Poll for new bars every ~2 minutes
         if tick % 4 != 0:
             continue
@@ -514,13 +521,24 @@ def run_live(cfg: dict) -> None:
         return
 
     raw_df = raw_df.iloc[:-1].copy()
-    df     = dh.enrich(raw_df)
+    try:
+        df = dh.enrich(raw_df)
+    except Exception as exc:
+        logger.error("Data enrichment failed during warmup: %s", exc, exc_info=True)
+        while _alive[0]:
+            time.sleep(30)
+            _write_status()
+        return
+
     htf_bias = _htf_bias_for_df(df, cfg)
 
-    for i in range(len(df)):
-        ts_key = str(df.index[i])[:10]
-        strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
-        ms_engine.update(df, i)
+    try:
+        for i in range(len(df)):
+            ts_key = str(df.index[i])[:10]
+            strategy.set_htf_bias(htf_bias.get(ts_key, Trend.UNKNOWN))
+            ms_engine.update(df, i)
+    except Exception as exc:
+        logger.error("Warmup market-structure failed at bar %d: %s", i, exc, exc_info=True)
 
     last_bar_time  = df.index[-1]
     last_price[0]  = float(df["close"].values[-1])
@@ -532,6 +550,20 @@ def run_live(cfg: dict) -> None:
         time.sleep(30)
         tick += 1
         _write_status()
+
+        # Heartbeat every 10 minutes
+        if tick % 20 == 0:
+            try:
+                acct = broker.get_account_info()
+                logger.info(
+                    "Heartbeat — equity $%.2f | open trades: %d | last bar: %s",
+                    acct.get("equity", 0), len(open_trades), last_bar_time,
+                )
+            except Exception as exc:
+                logger.info(
+                    "Heartbeat — open trades: %d | last bar: %s | broker: %s",
+                    len(open_trades), last_bar_time, exc,
+                )
 
         if tick % 4 != 0:
             continue
@@ -546,6 +578,7 @@ def run_live(cfg: dict) -> None:
             if new_bars.empty:
                 continue
 
+            logger.info("%d new bar(s) to process", len(new_bars))
             for bar_ts in new_bars.index:
                 bar_row = new_bars.loc[bar_ts]
                 new_row = pd.DataFrame(
