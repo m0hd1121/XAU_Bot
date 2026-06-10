@@ -228,7 +228,7 @@ export default function NotificationsPage() {
   }, [rawNotifications, dismissedIds, filterType, readIds])
 
   const handleMarkRead = useCallback((id: string) => {
-    setReadIds((prev) => new Set([...prev, id]))
+    setReadIds((prev) => new Set(Array.from(prev).concat(id)))
   }, [])
 
   const handleMarkAllRead = useCallback(() => {
@@ -236,7 +236,7 @@ export default function NotificationsPage() {
   }, [notifications])
 
   const handleDismiss = useCallback((id: string) => {
-    setDismissedIds((prev) => new Set([...prev, id]))
+    setDismissedIds((prev) => new Set(Array.from(prev).concat(id)))
   }, [])
 
   const updatePref = <K extends keyof NotificationPrefs>(key: K, value: NotificationPrefs[K]) => {

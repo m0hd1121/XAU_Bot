@@ -33,14 +33,15 @@ export default function LearningPage() {
   })
 
   const {
-    data: events,
+    data: eventsRaw,
     isLoading: eventsLoading,
     refetch: refetchEvents,
-  } = useQuery({
+  } = useQuery<unknown[]>({
     queryKey: ['learning', 'events'],
     queryFn: () => apiClient.getLearningEvents(100),
     refetchInterval: 30_000,
   })
+  const events: unknown[] = eventsRaw ?? []
 
   const isLoading = statsLoading || eventsLoading
 
@@ -151,11 +152,11 @@ export default function LearningPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {eventsLoading && (!events || events.length === 0) ? (
+              {eventsLoading && events.length === 0 ? (
                 <div className="flex justify-center py-8">
                   <Spinner />
                 </div>
-              ) : events && events.length > 0 ? (
+              ) : events.length > 0 ? (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                   {events.map((ev, i) => {
                     const e = ev as Record<string, unknown>

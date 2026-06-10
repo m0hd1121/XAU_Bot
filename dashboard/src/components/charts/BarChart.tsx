@@ -94,7 +94,7 @@ export function BarChart({
 
           <Bar dataKey={yKey} radius={[radius, radius, 0, 0]}>
             {data.map((entry, index) => {
-              const val = entry[yKey]
+              const val = (entry as Record<string, unknown>)[yKey]
               const barColor = colorByValue
                 ? typeof val === 'number' && val >= 0
                   ? '#10b981'

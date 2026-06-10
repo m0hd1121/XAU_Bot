@@ -7,6 +7,7 @@ type Size = 'sm' | 'md' | 'lg'
 interface MetricTileProps {
   label: string
   value: string | number
+  sub?: string
   change?: number
   prefix?: string
   suffix?: string
@@ -57,6 +58,7 @@ const valueSize: Record<Size, string> = {
 export default function MetricTile({
   label,
   value,
+  sub,
   change,
   prefix,
   suffix,
@@ -112,6 +114,9 @@ export default function MetricTile({
             {value}
             {suffix}
           </div>
+          {sub && (
+            <span className="text-xs text-zinc-500 truncate">{sub}</span>
+          )}
           {change !== undefined && (
             <ChangeIndicator change={change} colorize={colorize} />
           )}

@@ -45,7 +45,7 @@ export function SparkLine({
                 if (!active || !payload?.length) return null
                 return (
                   <div className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs font-mono text-amber-400">
-                    {payload[0]?.value?.toFixed(4)}
+                    {typeof payload[0]?.value === 'number' ? payload[0].value.toFixed(4) : payload[0]?.value}
                   </div>
                 )
               }}
