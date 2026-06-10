@@ -34,14 +34,17 @@ def main():
     info = broker.get_account_info()
     print(f"    Balance: ${info['balance']:.2f}  Equity: ${info['equity']:.2f}")
 
+    symbol = cfg.get("bot", {}).get("symbol", "XAUUSD")
+    print(f"    Symbol: {symbol}")
+
     # Snapshot positions before
     before = {p["ticket"] for p in broker.get_positions()}
     print(f"\n[2] Open positions before test: {len(before)}")
 
     # Place 0.01-lot market BUY (smallest possible, no SL/TP)
-    print("\n[3] Placing 0.01-lot MARKET BUY on XAUUSD...")
+    print(f"\n[3] Placing 0.01-lot MARKET BUY on {symbol}...")
     result = broker.place_order(
-        symbol="XAUUSD",
+        symbol=symbol,
         direction="BUY",
         lots=0.01,
         entry=0,
