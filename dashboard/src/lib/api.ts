@@ -383,7 +383,11 @@ class ApiClient {
     page?: number
     limit?: number
   }): Promise<{ logs: LogEntry[]; total: number }> {
-    return this.get<{ logs: LogEntry[]; total: number }>('/api/v1/logs', params)
+    const { limit, ...rest } = params
+    return this.get<{ logs: LogEntry[]; total: number }>('/api/v1/logs', {
+      ...rest,
+      ...(limit !== undefined ? { page_size: limit } : {}),
+    })
   }
 
   // ── Config ──────────────────────────────────────────────────────────────

@@ -33,11 +33,17 @@ _BOT_ROOT = settings.bot_root
 
 LOG_FILES: dict[str, Path] = {
     "bot":      _BOT_ROOT / "logs" / "xau_bot.log",
+    "trading":  _BOT_ROOT / "logs" / "xau_bot.log",   # alias
     "api":      settings.api_log_file,
     "trades":   _BOT_ROOT / "logs" / "trades.csv",
     "strategy": _BOT_ROOT / "logs" / "strategy.log",
     "learning": _BOT_ROOT / "logs" / "learning.log",
     "error":    _BOT_ROOT / "logs" / "error.log",
+    "agent1":   _BOT_ROOT / "logs" / "agent1.log",
+    "agent2":   _BOT_ROOT / "logs" / "agent2.log",
+    "agent3":   _BOT_ROOT / "logs" / "agent3.log",
+    "vps":      settings.api_log_file,                 # alias to api log
+    "auth":     settings.api_log_file,                 # alias to api log
 }
 
 # Matches: "2026-06-09 10:09:07  INFO      __main__  message text"
@@ -49,13 +55,13 @@ _LOG_RE = re.compile(
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _parse_line(line: str, fallback_level: str = "INFO") -> dict:
-    """Parse a structured log line into {timestamp, level, logger, message}."""
+    """Parse a structured log line into {timestamp, level, source, message}."""
     m = _LOG_RE.match(line.strip())
     if m:
         return {
             "timestamp": m.group(1),
             "level":     m.group(2).upper(),
-            "logger":    m.group(3),
+            "source":    m.group(3),
             "message":   m.group(4),
             "extra":     None,
         }
@@ -63,7 +69,7 @@ def _parse_line(line: str, fallback_level: str = "INFO") -> dict:
     return {
         "timestamp": "",
         "level":     fallback_level,
-        "logger":    "raw",
+        "source":    "raw",
         "message":   line.strip(),
         "extra":     None,
     }
