@@ -12,6 +12,8 @@ logs/
 data/*.db
 data/*.db-shm
 data/*.db-wal
+# Unexpanded env-var path artefacts (e.g. ${DATA_DIR:-data}/)
+'${DATA_DIR:-data}'/
 # Allow dashboard source files that happen to live under a logs/ directory
 !dashboard/src/app/logs/
 !dashboard/src/app/logs/**
