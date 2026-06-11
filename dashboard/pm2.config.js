@@ -8,6 +8,11 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: '3000',
         HOSTNAME: '0.0.0.0',
+        // NOTE: NEXT_PUBLIC_API_URL is baked into the JS bundle at build time
+        // and cannot be changed here at runtime. Set it before running
+        // deploy-dashboard.sh (or write it to .env.dashboard in the repo root).
+        // This entry is kept for documentation and for tools that read pm2.config.js.
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8443',
       },
       max_memory_restart: '512M',
       restart_delay: 3000,

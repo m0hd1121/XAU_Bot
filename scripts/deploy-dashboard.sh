@@ -7,6 +7,26 @@ LOG_DIR="$REPO_ROOT/logs"
 
 mkdir -p "$LOG_DIR"
 
+# ── Resolve the backend API URL ───────────────────────────────────────────────
+# Priority: 1) NEXT_PUBLIC_API_URL env var  2) .env.dashboard file  3) auto-detect
+if [[ -z "${NEXT_PUBLIC_API_URL:-}" ]]; then
+  ENV_FILE="$REPO_ROOT/.env.dashboard"
+  if [[ -f "$ENV_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+  fi
+fi
+
+if [[ -z "${NEXT_PUBLIC_API_URL:-}" ]]; then
+  # Fall back to the machine's primary public IP on port 8443
+  PUBLIC_IP="$(curl -sf --max-time 3 https://api.ipify.org || hostname -I | awk '{print $1}')"
+  export NEXT_PUBLIC_API_URL="http://${PUBLIC_IP}:8443"
+  echo "==> NEXT_PUBLIC_API_URL not set — auto-detected: $NEXT_PUBLIC_API_URL"
+else
+  export NEXT_PUBLIC_API_URL
+  echo "==> Using NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL"
+fi
+
 echo "==> Building dashboard..."
 cd "$DASH_DIR"
 npm ci --prefer-offline
