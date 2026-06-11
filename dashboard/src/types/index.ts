@@ -126,10 +126,11 @@ export interface BotStatus {
   mode: BotMode | string
   emergency_stopped: boolean
   uptime_seconds: number
+  paused?: boolean
   current_session?: string
   learning_enabled?: boolean
   maintenance_mode?: boolean
-  pid?: number
+  pid?: number | null
 }
 
 export interface AccountInfo {

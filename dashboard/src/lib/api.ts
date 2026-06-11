@@ -254,15 +254,18 @@ class ApiClient {
   }
 
   async startBot(): Promise<void> {
-    return this.post<void>('/api/v1/bot/start')
+    const r = await this.post<{ success: boolean; message?: string }>('/api/v1/bot/start')
+    if (r && !r.success) throw new ApiError(422, r.message ?? 'Bot failed to start')
   }
 
   async stopBot(): Promise<void> {
-    return this.post<void>('/api/v1/bot/stop')
+    const r = await this.post<{ success: boolean; message?: string }>('/api/v1/bot/stop')
+    if (r && !r.success) throw new ApiError(422, r.message ?? 'Bot failed to stop')
   }
 
   async restartBot(): Promise<void> {
-    return this.post<void>('/api/v1/bot/restart')
+    const r = await this.post<{ success: boolean; message?: string }>('/api/v1/bot/restart')
+    if (r && !r.success) throw new ApiError(422, r.message ?? 'Bot failed to restart')
   }
 
   async pauseBot(): Promise<void> {

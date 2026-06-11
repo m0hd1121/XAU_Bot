@@ -1,19 +1,25 @@
 'use client'
 
+import { useState } from 'react'
 import PageHeader from '@/components/ui/PageHeader'
 import MetricTile from '@/components/ui/MetricTile'
 import Card, { CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import StatusDot from '@/components/ui/StatusDot'
 import Badge from '@/components/ui/Badge'
-import { useDashboard, useEquityCurve } from '@/hooks/useApi'
+import Button from '@/components/ui/Button'
+import { useDashboard, useEquityCurve, useBotControl } from '@/hooks/useApi'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { formatCurrency, formatDuration, pnlColor } from '@/lib/utils'
 import AreaChartComponent from '@/components/charts/AreaChart'
+import { ApiError } from '@/lib/api'
+import { Play, Square, RotateCcw, AlertTriangle, Pause, PlayCircle } from 'lucide-react'
 
 export default function DashboardPage() {
-  const { data: snapshot, isLoading } = useDashboard()
+  const { data: snapshot, isLoading, refetch: refetchDashboard } = useDashboard()
   const { dashboard: liveDashboard, state: wsState } = useWebSocket()
   const { data: equityCurve } = useEquityCurve()
+  const botControl = useBotControl()
+  const [botError, setBotError] = useState<string | null>(null)
 
   // Prefer live WS data over polled data
   const data = liveDashboard ?? snapshot
@@ -24,6 +30,22 @@ export default function DashboardPage() {
 
   const wsConnected = wsState === 'connected'
   const loading = isLoading && !data
+
+  async function handleBot(command: 'start' | 'stop' | 'restart' | 'pause' | 'resume' | 'emergency-stop') {
+    setBotError(null)
+    try {
+      await botControl.mutateAsync(command)
+      void refetchDashboard()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setBotError(err.message)
+      } else if (err instanceof Error) {
+        setBotError(err.message)
+      } else {
+        setBotError('Command failed')
+      }
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -219,26 +241,118 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Bot info */}
-      {botStatus && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricTile
-            label="Mode"
-            value={String(botStatus.mode).toUpperCase()}
-            size="sm"
-          />
-          <MetricTile
-            label="Session"
-            value={botStatus.current_session ?? '—'}
-            size="sm"
-          />
-          <MetricTile
-            label="Learning"
-            value={botStatus.learning_enabled ? 'Enabled' : 'Disabled'}
-            size="sm"
-          />
-        </div>
-      )}
+      {/* Bot control */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Bot Control</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-3">
+            {botStatus?.running ? (
+              <>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  iconLeft={<Square size={13} />}
+                  loading={botControl.isPending}
+                  onClick={() => void handleBot('stop')}
+                >
+                  Stop
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  iconLeft={<RotateCcw size={13} />}
+                  loading={botControl.isPending}
+                  onClick={() => void handleBot('restart')}
+                >
+                  Restart
+                </Button>
+                {botStatus.paused ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    iconLeft={<PlayCircle size={13} />}
+                    loading={botControl.isPending}
+                    onClick={() => void handleBot('resume')}
+                  >
+                    Resume
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    iconLeft={<Pause size={13} />}
+                    loading={botControl.isPending}
+                    onClick={() => void handleBot('pause')}
+                  >
+                    Pause
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                iconLeft={<Play size={13} />}
+                loading={botControl.isPending}
+                onClick={() => void handleBot('start')}
+              >
+                Start Bot
+              </Button>
+            )}
+
+            {botStatus?.emergency_stopped && (
+              <span className="flex items-center gap-1.5 text-xs text-red-400">
+                <AlertTriangle size={13} />
+                Emergency stopped — clear via admin
+              </span>
+            )}
+
+            {botError && (
+              <span className="flex items-center gap-1.5 text-xs text-red-400 max-w-xs">
+                <AlertTriangle size={13} className="flex-shrink-0" />
+                <span className="truncate">{botError}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Bot info row */}
+          {botStatus && (
+            <div className="mt-4 pt-4 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <MetricTile label="Mode" value={String(botStatus.mode).toUpperCase()} size="sm" />
+              <MetricTile label="Uptime" value={formatDuration(botStatus.uptime_seconds)} size="sm" />
+              <MetricTile
+                label="Status"
+                value={
+                  botStatus.emergency_stopped
+                    ? 'EMERGENCY STOP'
+                    : botStatus.paused
+                    ? 'PAUSED'
+                    : botStatus.running
+                    ? 'RUNNING'
+                    : 'STOPPED'
+                }
+                size="sm"
+                valueClassName={
+                  botStatus.emergency_stopped
+                    ? 'text-red-400'
+                    : botStatus.paused
+                    ? 'text-amber-400'
+                    : botStatus.running
+                    ? 'text-emerald-400'
+                    : 'text-zinc-500'
+                }
+              />
+              <MetricTile
+                label="Learning"
+                value={botStatus.learning_enabled ? 'Enabled' : 'Disabled'}
+                size="sm"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

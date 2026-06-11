@@ -21,6 +21,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import signal
 import sqlite3
 import subprocess
@@ -34,6 +35,18 @@ import yaml
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _expand_env_vars(raw: str) -> str:
+    """Replace ${VAR} and ${VAR:-default} in a raw YAML string before parsing."""
+    def _replace(match: re.Match) -> str:
+        inner = match.group(1)
+        if ":-" in inner:
+            var, default = inner.split(":-", 1)
+            return os.environ.get(var.strip(), default.strip())
+        return os.environ.get(inner.strip(), "")
+    return re.sub(r"\$\{([^}]+)\}", _replace, raw)
+
 
 # ── Resolved paths ────────────────────────────────────────────────────────────
 
@@ -420,8 +433,8 @@ class BotService:
         if not CONFIG_PATH.exists():
             return _default_config()
         try:
-            with open(CONFIG_PATH) as f:
-                cfg = yaml.safe_load(f) or {}
+            raw = CONFIG_PATH.read_text()
+            cfg = yaml.safe_load(_expand_env_vars(raw)) or {}
             # Merge with defaults so missing keys don't break the iOS app
             defaults = _default_config()
             for section, values in defaults.items():
