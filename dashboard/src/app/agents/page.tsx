@@ -334,7 +334,7 @@ export default function AgentsPage() {
   const [confirmAllStop, setConfirmAllStop] = useState(false)
 
   const { data: agents = [], isLoading, error, refetch } = useAllAgents()
-  const { mutate: controlAgent, isPending: controlPending } = useControlAgent()
+  const { mutate: controlAgent, isPending: controlPending, error: controlError } = useControlAgent()
 
   // Poll every 10s
   useEffect(() => {
@@ -344,7 +344,7 @@ export default function AgentsPage() {
 
   // Derive summary
   const runningCount = agents.filter((a) => a.status === 'running').length
-  const allStopped = agents.every((a) => a.status === 'stopped' || a.status === 'error')
+  const hasNonRunning = agents.some((a) => a.status !== 'running')
   const anyRunning = agents.some((a) => a.status === 'running' || a.status === 'paused')
 
   function handleControl(agentId: string, cmd: 'start' | 'pause' | 'resume' | 'stop' | 'restart') {
@@ -410,7 +410,7 @@ export default function AgentsPage() {
         </span>
 
         <div className="flex items-center gap-2">
-          {allStopped && agents.length > 0 && (
+          {hasNonRunning && agents.length > 0 && (
             <button
               onClick={handleStartAll}
               disabled={controlPending}
@@ -471,6 +471,21 @@ export default function AgentsPage() {
           >
             Retry
           </button>
+        </div>
+      )}
+
+      {/* ── Control error ───────────────────────────────────────────────── */}
+      {controlError && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-red-300 text-sm font-medium">Agent failed to start</p>
+              <pre className="text-red-400/80 text-xs mt-1 whitespace-pre-wrap break-all font-mono max-h-32 overflow-y-auto">
+                {controlError.message}
+              </pre>
+            </div>
+          </div>
         </div>
       )}
 

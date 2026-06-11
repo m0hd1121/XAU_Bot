@@ -46,6 +46,7 @@ from agents.shared_db import (
     get_recent_trade_decisions,
     promote_strategy,
     upsert_strategy_candidate,
+    upsert_agent_state,
 )
 from agents.message_bus import (
     publish,
@@ -358,6 +359,22 @@ async def start_agent(
     log_path = _BOT_ROOT / "logs" / f"{agent_id}.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Mark as "starting" in DB so the UI reflects something is happening
+    try:
+        _db_conn = connect(_db_path())
+        upsert_agent_state(_db_conn, agent_id, status="starting", current_task="Starting up…")
+        _db_conn.close()
+    except Exception:
+        pass
+
+    def _set_db_status(status: str, task: str) -> None:
+        try:
+            c = connect(_db_path())
+            upsert_agent_state(c, agent_id, status=status, current_task=task)
+            c.close()
+        except Exception:
+            pass
+
     try:
         with open(log_path, "a") as log_fh:
             proc = subprocess.Popen(
@@ -375,15 +392,26 @@ async def start_agent(
             p = _psutil.Process(proc.pid)
             if not (p.is_running() and p.status() != _psutil.STATUS_ZOMBIE):
                 pid_file.unlink(missing_ok=True)
-                tail = log_path.read_text(errors="replace")[-600:].strip()
-                return {"status": "error", "detail": f"Agent exited immediately. Log: {tail}"}
+                tail = log_path.read_text(errors="replace")[-1000:].strip()
+                _set_db_status("stopped", f"Crashed on startup")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Agent exited immediately. Log:\n{tail}",
+                )
         except _psutil.NoSuchProcess:
             pid_file.unlink(missing_ok=True)
-            tail = log_path.read_text(errors="replace")[-600:].strip()
-            return {"status": "error", "detail": f"Agent died on startup. Log: {tail}"}
+            tail = log_path.read_text(errors="replace")[-1000:].strip()
+            _set_db_status("stopped", f"Crashed on startup")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Agent died on startup. Log:\n{tail}",
+            )
 
         return {"status": "ok", "detail": f"{agent_id} started (PID {proc.pid})", "pid": proc.pid}
+    except HTTPException:
+        raise
     except Exception as exc:
+        _set_db_status("stopped", f"Start error: {exc}")
         raise HTTPException(status_code=500, detail=f"Failed to start {agent_id}: {exc}")
 
 
