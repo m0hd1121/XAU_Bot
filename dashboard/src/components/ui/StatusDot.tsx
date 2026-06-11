@@ -8,6 +8,7 @@ export type StatusType =
   | 'error'
   | 'warning'
   | 'unknown'
+  | 'starting'
 
 type DotSize = 'sm' | 'md' | 'lg'
 
@@ -46,6 +47,11 @@ const dotConfig: Record<
   },
   unknown: {
     bg: 'bg-zinc-600',
+  },
+  starting: {
+    bg: 'bg-blue-500',
+    ring: 'ring-blue-500/30',
+    animate: 'animate-pulse',
   },
 }
 
