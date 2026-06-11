@@ -77,7 +77,7 @@ export function formatISOTimestamp(iso: string): string {
  * Format seconds into a human-readable duration string (e.g. "2h 34m 12s").
  */
 export function formatDuration(seconds: number | null | undefined): string {
-  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return '—'
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '—'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
