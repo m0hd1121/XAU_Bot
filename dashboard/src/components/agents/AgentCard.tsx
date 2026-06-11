@@ -35,6 +35,7 @@ const STATUS_BORDER: Record<AgentStatus, string> = {
   paused: 'border-l-amber-500',
   error: 'border-l-red-500',
   stopped: 'border-l-zinc-600',
+  starting: 'border-l-blue-500',
 }
 
 const STATUS_BADGE_VARIANT: Record<AgentStatus, string> = {
@@ -42,6 +43,7 @@ const STATUS_BADGE_VARIANT: Record<AgentStatus, string> = {
   paused: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   error: 'bg-red-500/10 text-red-400 border-red-500/20',
   stopped: 'bg-zinc-800 text-zinc-400 border-zinc-700',
+  starting: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
 }
 
 function formatUptime(seconds: number): string {
@@ -147,7 +149,7 @@ export function AgentCard({ agent, onControl, isPending = false, className }: Ag
   const borderClass = STATUS_BORDER[agent.status]
   const badgeClass = STATUS_BADGE_VARIANT[agent.status]
 
-  const canStart = agent.status !== 'running'
+  const canStart = agent.status !== 'running' && agent.status !== 'starting'
   const canPause = agent.status === 'running'
   const canResume = false  // Start covers this — Resume only works if process is alive
   const canStop = agent.status === 'running' || agent.status === 'paused'

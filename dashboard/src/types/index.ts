@@ -5,7 +5,7 @@ export interface UserProfile { id: number; username: string; email: string; role
 
 // ─── Agent ───────────────────────────────────────────────────────────────────
 export type AgentId = 'agent1' | 'agent2' | 'agent3'
-export type AgentStatus = 'running' | 'stopped' | 'paused' | 'error'
+export type AgentStatus = 'running' | 'stopped' | 'paused' | 'error' | 'starting'
 
 export interface AgentMetrics {
   cycle_count?: number

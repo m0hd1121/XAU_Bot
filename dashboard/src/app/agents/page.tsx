@@ -36,6 +36,7 @@ const STATUS_COLORS: Record<AgentStatus | 'unknown', { fill: string; stroke: str
   paused: { fill: '#451a03', stroke: '#f59e0b', text: '#f59e0b' },
   error: { fill: '#450a0a', stroke: '#f87171', text: '#f87171' },
   stopped: { fill: '#1c1c1e', stroke: '#3f3f46', text: '#a1a1aa' },
+  starting: { fill: '#0c1a3a', stroke: '#60a5fa', text: '#60a5fa' },
   unknown: { fill: '#18181b', stroke: '#3f3f46', text: '#71717a' },
 }
 
