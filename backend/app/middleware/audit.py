@@ -50,13 +50,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
         try:
             async with AsyncSessionLocal() as db:
                 entry = AuditLog(
-                    user_id    = user_id,
-                    client_ip  = client_ip,
-                    method     = request.method,
-                    path       = str(request.url.path),
-                    body_hash  = None,
-                    status_code= response.status_code,
-                    elapsed_ms = elapsed,
+                    user_id     = user_id,
+                    ip_address  = client_ip,
+                    action      = f"{request.method} {request.url.path}",
+                    method      = request.method,
+                    path        = str(request.url.path),
+                    status_code = response.status_code,
+                    duration_ms = elapsed,
                 )
                 db.add(entry)
                 await db.commit()

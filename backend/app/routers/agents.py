@@ -38,6 +38,7 @@ sys.path.insert(0, str(_REPO_ROOT))
 
 from agents.shared_db import (
     connect,
+    init_schema,
     get_all_agent_states,
     get_agent_state,
     get_strategy_candidates,
@@ -117,9 +118,10 @@ def _db_path() -> Path:
 
 
 def _open_db():
-    """Open agents.db and return a connection; raise 503 on failure."""
+    """Open agents.db, create schema if needed, raise 503 on failure."""
     db = _db_path()
     try:
+        init_schema(db)
         conn = connect(db)
         return conn
     except Exception as exc:

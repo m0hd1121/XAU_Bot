@@ -233,8 +233,13 @@ async def _authenticate_ws_message(websocket: WebSocket) -> tuple[int, str]:
         from app.auth.security import decode_token, TOKEN_TYPE_ACCESS
         payload = decode_token(token, TOKEN_TYPE_ACCESS)
         return int(payload["sub"]), payload.get("usr", "unknown")
+    except WebSocketDisconnect:
+        raise ValueError("Client disconnected before auth")
     except (asyncio.TimeoutError, json.JSONDecodeError, KeyError) as exc:
-        await websocket.close(code=4001, reason="Auth failed")
+        try:
+            await websocket.close(code=4001, reason="Auth failed")
+        except Exception:
+            pass
         raise ValueError(f"Auth failed: {exc}") from exc
 
 
