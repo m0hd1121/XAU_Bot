@@ -353,7 +353,7 @@ export default function AgentsPage() {
 
   async function handleStartAll() {
     for (const a of agents) {
-      if (a.status === 'stopped' || a.status === 'error') {
+      if (a.status !== 'running') {
         controlAgent({ id: a.agent_id as AgentId, command: 'start' })
         await new Promise((r) => setTimeout(r, 1000))
       }

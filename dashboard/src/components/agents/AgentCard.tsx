@@ -147,9 +147,9 @@ export function AgentCard({ agent, onControl, isPending = false, className }: Ag
   const borderClass = STATUS_BORDER[agent.status]
   const badgeClass = STATUS_BADGE_VARIANT[agent.status]
 
-  const canStart = agent.status === 'stopped' || agent.status === 'error'
+  const canStart = agent.status !== 'running'
   const canPause = agent.status === 'running'
-  const canResume = agent.status === 'paused'
+  const canResume = false  // Start covers this — Resume only works if process is alive
   const canStop = agent.status === 'running' || agent.status === 'paused'
 
   return (
