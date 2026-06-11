@@ -34,9 +34,10 @@ export default function LoginPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message)
-      } else if (err instanceof TypeError && err.message.includes('fetch')) {
+      } else if (err instanceof TypeError) {
+        // "Failed to fetch" (Chrome) or "Load failed" (Safari) = network error
         const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8443'
-        setError(`Cannot reach API server (${apiUrl}). Check network or firewall.`)
+        setError(`Cannot reach API server at ${apiUrl} — check firewall/port.`)
       } else {
         setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
       }
