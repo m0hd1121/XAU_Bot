@@ -8,6 +8,10 @@ build/
 .env
 *.log
 logs/
+# Runtime databases (generated at runtime, not source)
+data/*.db
+data/*.db-shm
+data/*.db-wal
 # Allow dashboard source files that happen to live under a logs/ directory
 !dashboard/src/app/logs/
 !dashboard/src/app/logs/**
