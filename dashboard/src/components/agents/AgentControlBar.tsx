@@ -30,13 +30,15 @@ const STATUS_LABELS: Record<AgentStatus, string> = {
   paused: 'Paused',
   error: 'Error',
   stopped: 'Stopped',
+  starting: 'Starting',
 }
 
-const STATUS_DOT_MAP: Record<AgentStatus, 'running' | 'paused' | 'error' | 'stopped'> = {
+const STATUS_DOT_MAP: Record<AgentStatus, 'running' | 'paused' | 'error' | 'stopped' | 'starting'> = {
   running: 'running',
   paused: 'paused',
   error: 'error',
   stopped: 'stopped',
+  starting: 'starting',
 }
 
 const STATUS_TEXT_CLASS: Record<AgentStatus, string> = {
@@ -44,6 +46,7 @@ const STATUS_TEXT_CLASS: Record<AgentStatus, string> = {
   paused: 'text-amber-400',
   error: 'text-red-400',
   stopped: 'text-zinc-400',
+  starting: 'text-blue-400',
 }
 
 const CONFIRM_MESSAGES: Record<NonNullable<ConfirmAction>, string> = {
