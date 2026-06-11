@@ -70,7 +70,7 @@ export function AgentControlBar({
   const canStop = status === 'running' || status === 'paused'
   const busy = isPending || localPending
 
-  async function executeCommand(cmd: 'pause' | 'resume' | 'stop' | 'restart') {
+  async function executeCommand(cmd: 'start' | 'pause' | 'resume' | 'stop' | 'restart') {
     setLocalPending(true)
     try {
       await onCommand(cmd)
