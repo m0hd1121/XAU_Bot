@@ -313,7 +313,25 @@ def _from_ios_config(ios: dict, raw: dict) -> dict:
     return cfg
 
 
+def _flatten_config(cfg: dict, prefix: str = "") -> dict:
+    """Recursively flatten a nested dict to dot-notation keys."""
+    result: dict = {}
+    for key, value in cfg.items():
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            result.update(_flatten_config(value, path))
+        else:
+            result[path] = value
+    return result
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/raw", summary="Get flat dot-notation config for the dashboard")
+async def get_raw_config(_user=Depends(require_admin)) -> dict:
+    """Returns config.yaml fully expanded and flattened to dot-notation paths."""
+    return _flatten_config(bot_service.read_config())
+
 
 @router.get("", summary="Get full bot configuration")
 async def get_config(_user=Depends(require_admin)) -> dict:

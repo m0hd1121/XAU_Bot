@@ -389,7 +389,7 @@ class ApiClient {
   // ── Config ──────────────────────────────────────────────────────────────
 
   async getConfig(): Promise<Record<string, unknown>> {
-    return this.get<Record<string, unknown>>('/api/v1/config')
+    return this.get<Record<string, unknown>>('/api/v1/config/raw')
   }
 
   async updateConfigField(path: string, value: unknown): Promise<void> {
