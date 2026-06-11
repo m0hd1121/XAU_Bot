@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import Optional
 
 import numpy as np
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Trend(Enum):
-    BULLISH = auto()
-    BEARISH = auto()
-    RANGING = auto()
-    UNKNOWN = auto()
+    BULLISH = "BULLISH"
+    BEARISH = "BEARISH"
+    RANGING = "RANGING"
+    UNKNOWN = "UNKNOWN"
 
 
 class StructureEvent(Enum):

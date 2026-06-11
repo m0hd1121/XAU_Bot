@@ -270,7 +270,7 @@ function TradingDashboardTab({
   openTrades: TradeRecord[]
   closedTrades: TradeRecord[]
   isPending: boolean
-  onCommand: (cmd: 'pause' | 'resume' | 'stop' | 'restart') => Promise<void>
+  onCommand: (cmd: 'start' | 'pause' | 'resume' | 'stop' | 'restart') => Promise<void>
   onEmergencyStop: () => void
 }) {
   const [selectedDecision, setSelectedDecision] = useState<TradeDecision | null>(null)
@@ -1442,7 +1442,7 @@ export default function Agent3Page() {
   // ── Mutations ────────────────────────────────────────────────────────────
 
   const controlMutation = useMutation({
-    mutationFn: (cmd: 'pause' | 'resume' | 'stop' | 'restart') =>
+    mutationFn: (cmd: 'start' | 'pause' | 'resume' | 'stop' | 'restart') =>
       apiClient.controlAgent('agent3', cmd),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['agent', 'agent3'] })
@@ -1450,7 +1450,7 @@ export default function Agent3Page() {
   })
 
   const handleCommand = useCallback(
-    async (cmd: 'pause' | 'resume' | 'stop' | 'restart') => {
+    async (cmd: 'start' | 'pause' | 'resume' | 'stop' | 'restart') => {
       await controlMutation.mutateAsync(cmd)
     },
     [controlMutation]

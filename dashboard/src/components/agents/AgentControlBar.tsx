@@ -19,7 +19,7 @@ import {
 export interface AgentControlBarProps {
   agentId: AgentId
   status: AgentStatus
-  onCommand: (cmd: 'pause' | 'resume' | 'stop' | 'restart') => Promise<void>
+  onCommand: (cmd: 'start' | 'pause' | 'resume' | 'stop' | 'restart') => Promise<void>
   isPending?: boolean
 }
 
@@ -156,7 +156,7 @@ export function AgentControlBar({
             <Button
               size="sm"
               className="flex-1 h-9 bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-medium border-0 text-sm"
-              onClick={() => executeCommand('resume')}
+              onClick={() => executeCommand('start')}
               disabled={busy}
             >
               {busy ? <Spinner size="xs" /> : <Play className="w-4 h-4 mr-1.5" />}
