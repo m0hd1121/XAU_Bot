@@ -113,6 +113,8 @@ function agentStatusToHealth(
       return 'online'
     case 'paused':
       return 'degraded'
+    case 'starting':
+      return 'degraded'
     case 'error':
       return 'offline'
     case 'stopped':
