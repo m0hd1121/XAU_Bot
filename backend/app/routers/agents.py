@@ -58,6 +58,17 @@ from agents.message_bus import (
 from app.auth.security import require_admin as require_auth
 from app.config import settings
 
+# Paths for launching agent subprocesses
+_BOT_ROOT   = settings.bot_root
+_VENV_PY    = _BOT_ROOT / ".venv" / "bin" / "python"
+_AGENT_RUNNER = _BOT_ROOT / "agents" / "run_agent.py"
+_PYTHON     = str(_VENV_PY) if _VENV_PY.exists() else "python3"
+_AGENT_PIDS = {
+    "agent1": _BOT_ROOT / "data" / ".agent1.pid",
+    "agent2": _BOT_ROOT / "data" / ".agent2.pid",
+    "agent3": _BOT_ROOT / "data" / ".agent3.pid",
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Response models
 # ─────────────────────────────────────────────────────────────────────────────
@@ -303,7 +314,77 @@ async def stop_agent(
 ) -> dict[str, str]:
     _validate_agent(agent_id)
     event_id = _send_control(agent_id, EV_AGENT_STOP)
+    # Also kill the PID if it exists
+    pid_file = _AGENT_PIDS.get(agent_id)
+    if pid_file and pid_file.exists():
+        try:
+            import signal as _signal
+            pid = int(pid_file.read_text().strip())
+            import os as _os
+            _os.kill(pid, _signal.SIGTERM)
+        except Exception:
+            pass
+        pid_file.unlink(missing_ok=True)
     return {"status": "ok", "command": "stop", "agent_id": agent_id, "event_id": event_id}
+
+
+@router.post("/{agent_id}/start")
+async def start_agent(
+    agent_id: str,
+    _user=Depends(require_auth),
+) -> dict[str, Any]:
+    """Launch the agent as a background subprocess if it is not already running."""
+    import asyncio as _asyncio
+    import psutil as _psutil
+
+    _validate_agent(agent_id)
+    num = agent_id[-1]  # "1", "2", or "3"
+
+    # Check if already running via PID file
+    pid_file = _AGENT_PIDS[agent_id]
+    pid_file.parent.mkdir(parents=True, exist_ok=True)
+    if pid_file.exists():
+        try:
+            pid = int(pid_file.read_text().strip())
+            p = _psutil.Process(pid)
+            if p.is_running() and p.status() != _psutil.STATUS_ZOMBIE:
+                return {"status": "ok", "detail": f"{agent_id} is already running", "pid": pid}
+        except (_psutil.NoSuchProcess, ValueError):
+            pid_file.unlink(missing_ok=True)
+
+    if not _AGENT_RUNNER.exists():
+        raise HTTPException(status_code=500, detail=f"Agent runner not found: {_AGENT_RUNNER}")
+
+    log_path = _BOT_ROOT / "logs" / f"{agent_id}.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(log_path, "a") as log_fh:
+            proc = subprocess.Popen(
+                [_PYTHON, str(_AGENT_RUNNER), num],
+                cwd=str(_BOT_ROOT),
+                start_new_session=True,
+                stdout=log_fh,
+                stderr=log_fh,
+            )
+        pid_file.write_text(str(proc.pid))
+
+        # Brief wait to catch immediate crashes
+        await _asyncio.sleep(3)
+        try:
+            p = _psutil.Process(proc.pid)
+            if not (p.is_running() and p.status() != _psutil.STATUS_ZOMBIE):
+                pid_file.unlink(missing_ok=True)
+                tail = log_path.read_text(errors="replace")[-600:].strip()
+                return {"status": "error", "detail": f"Agent exited immediately. Log: {tail}"}
+        except _psutil.NoSuchProcess:
+            pid_file.unlink(missing_ok=True)
+            tail = log_path.read_text(errors="replace")[-600:].strip()
+            return {"status": "error", "detail": f"Agent died on startup. Log: {tail}"}
+
+        return {"status": "ok", "detail": f"{agent_id} started (PID {proc.pid})", "pid": proc.pid}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to start {agent_id}: {exc}")
 
 
 @router.post("/{agent_id}/restart")

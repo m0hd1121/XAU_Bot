@@ -296,7 +296,7 @@ class ApiClient {
 
   async controlAgent(
     id: AgentId,
-    command: 'pause' | 'resume' | 'stop' | 'restart',
+    command: 'start' | 'pause' | 'resume' | 'stop' | 'restart',
   ): Promise<void> {
     return this.post<void>(`/api/v1/agents/${id}/${command}`)
   }

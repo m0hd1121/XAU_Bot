@@ -19,7 +19,7 @@ import {
 
 export interface AgentCardProps {
   agent: AgentState
-  onControl: (command: 'pause' | 'resume' | 'stop' | 'restart') => void
+  onControl: (command: 'start' | 'pause' | 'resume' | 'stop' | 'restart') => void
   isPending?: boolean
   className?: string
 }
@@ -147,6 +147,7 @@ export function AgentCard({ agent, onControl, isPending = false, className }: Ag
   const borderClass = STATUS_BORDER[agent.status]
   const badgeClass = STATUS_BADGE_VARIANT[agent.status]
 
+  const canStart = agent.status === 'stopped' || agent.status === 'error'
   const canPause = agent.status === 'running'
   const canResume = agent.status === 'paused'
   const canStop = agent.status === 'running' || agent.status === 'paused'
@@ -219,6 +220,18 @@ export function AgentCard({ agent, onControl, isPending = false, className }: Ag
 
         {/* Control buttons */}
         <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-zinc-800">
+          {canStart && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-7 text-xs text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+              onClick={() => onControl('start')}
+              disabled={isPending}
+            >
+              <Play className="w-3 h-3 mr-1" />
+              Start
+            </Button>
+          )}
           {canPause && (
             <Button
               variant="ghost"

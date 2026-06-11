@@ -150,7 +150,7 @@ export function useEquityCurve() {
 export function useControlAgent(): UseMutationResult<
   void,
   Error,
-  { id: AgentId; command: 'pause' | 'resume' | 'stop' | 'restart' }
+  { id: AgentId; command: 'start' | 'pause' | 'resume' | 'stop' | 'restart' }
 > {
   const qc = useQueryClient()
   return useMutation({
