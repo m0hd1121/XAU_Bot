@@ -14,6 +14,10 @@ from typing import List, Optional
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Derive the repo root from this file's location so defaults work on any machine.
+# backend/app/config.py → .parent.parent.parent = repo root
+_REPO_ROOT = Path(__file__).parent.parent.parent
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -51,17 +55,17 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     # ── Database ──────────────────────────────────────────────────────────────
-    database_url: str = "sqlite+aiosqlite:////home/user/XAU_Bot/backend/data/api.db"
+    database_url: str = f"sqlite+aiosqlite:///{_REPO_ROOT}/backend/data/api.db"
 
     # ── XAU Bot paths ─────────────────────────────────────────────────────────
-    bot_root: Path = Path("/home/user/XAU_Bot")
-    bot_config_path: Path = Path("/home/user/XAU_Bot/config.yaml")
-    bot_learning_db: Path = Path("/home/user/XAU_Bot/data/learning.db")
-    bot_log_file: Path = Path("/home/user/XAU_Bot/logs/xau_bot.log")
-    bot_trades_csv: Path = Path("/home/user/XAU_Bot/logs/trades.csv")
-    bot_pid_file: Path = Path("/home/user/XAU_Bot/bot.pid")
-    bot_main_script: Path = Path("/home/user/XAU_Bot/main.py")
-    bot_venv_python: Path = Path("/home/user/XAU_Bot/venv/bin/python")
+    bot_root: Path = _REPO_ROOT
+    bot_config_path: Path = _REPO_ROOT / "config.yaml"
+    bot_learning_db: Path = _REPO_ROOT / "data" / "learning.db"
+    bot_log_file: Path = _REPO_ROOT / "logs" / "xau_bot.log"
+    bot_trades_csv: Path = _REPO_ROOT / "logs" / "trades.csv"
+    bot_pid_file: Path = _REPO_ROOT / "bot.pid"
+    bot_main_script: Path = _REPO_ROOT / "main.py"
+    bot_venv_python: Path = _REPO_ROOT / ".venv" / "bin" / "python"
 
     # ── Systemd service names ─────────────────────────────────────────────────
     bot_service_name: str = "xaubot"
@@ -69,7 +73,7 @@ class Settings(BaseSettings):
     worker_service_name: str = "xaubot-worker"
 
     # ── Backup ────────────────────────────────────────────────────────────────
-    backup_dir: Path = Path("/home/user/XAU_Bot/backend/backups")
+    backup_dir: Path = _REPO_ROOT / "backend" / "backups"
     max_backups_to_keep: int = 20
 
     # ── Rate Limiting ─────────────────────────────────────────────────────────
@@ -102,10 +106,9 @@ class Settings(BaseSettings):
 
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = "INFO"
-    api_log_file: Path = Path("/home/user/XAU_Bot/backend/logs/api.log")
+    api_log_file: Path = _REPO_ROOT / "backend" / "logs" / "api.log"
 
     # ── Compatibility aliases ─────────────────────────────────────────────────
-    # Some older code references settings.bot_dir and settings.apns_sandbox
 
     @property
     def bot_dir(self) -> Path:
