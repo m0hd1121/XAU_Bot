@@ -127,6 +127,10 @@ class Agent3TraderAgent(BaseAgent):
             self.log.warning("Agent3: could not sync initial account equity.")
 
         self.log.info("Agent3: all subsystems initialised.")
+        self.update_metrics({
+            "open_trades_count": 0,
+            "consecutive_losses": 0,
+        })
 
     async def on_stop(self) -> None:
         if self._learning_engine is not None:

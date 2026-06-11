@@ -83,6 +83,11 @@ class Agent2IntelligenceAgent(BaseAgent):
         self._data_handler = DataHandler(cfg)
         self._risk_manager = RiskManager(cfg)
         self.log.info("Agent2: market structure engine and data handler ready.")
+        self.update_metrics({
+            "regime": "UNKNOWN",
+            "risk_score": 0.5,
+            "trend": "UNKNOWN",
+        })
 
     # ── Main cycle ────────────────────────────────────────────────────────────
 
@@ -249,9 +254,9 @@ class Agent2IntelligenceAgent(BaseAgent):
 
         # ── Update metrics ─────────────────────────────────────────────────────
         self.update_metrics({
-            "last_regime": regime,
-            "last_risk_score": round(risk_score, 3),
-            "last_trend": state.trend.value,
+            "regime": regime,
+            "risk_score": round(risk_score, 3),
+            "trend": state.trend.value,
             "active_demand_zones": len(demand_zones),
             "active_supply_zones": len(supply_zones),
             "high_impact_events": len(high_impact),

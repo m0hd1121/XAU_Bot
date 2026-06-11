@@ -79,11 +79,11 @@ class Agent1ResearcherAgent(BaseAgent):
 
     def __init__(
         self,
-        cfg: dict,
-        *,
+        agent_id: str = "agent1",
+        cfg: dict = None,
         db_path: Path | str | None = None,
     ) -> None:
-        super().__init__("agent1", cfg, db_path=db_path)
+        super().__init__(agent_id, cfg or {}, db_path=db_path)
 
         # Data source used for all backtests.
         self._data_csv_path: str = str(
