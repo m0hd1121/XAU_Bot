@@ -225,6 +225,10 @@ class RiskManager:
     def update_equity(self, equity: float) -> None:
         self._equity = equity
         self._peak = max(self._peak, equity)
+        if self._current_day is None:
+            # Startup sync — align daily_start with actual broker equity so
+            # accumulated P&L from previous sessions doesn't count as today's loss
+            self._daily_start = equity
 
     @property
     def equity(self) -> float:
@@ -269,7 +273,11 @@ class RiskManager:
             # Actual day change — snapshot today's starting equity
             self._daily_start = self._equity
             logger.info("New trading day %s — daily equity reset to %.2f", today, self._equity)
-        # First call: keep _daily_start at initial_capital (set in __init__)
+        else:
+            # First call within this session — _daily_start was already aligned
+            # in update_equity() at startup, or defaults to initial_capital if
+            # no broker equity sync occurred
+            pass
         self._current_day = today
 
     def _halt(self, reason: str) -> None:
