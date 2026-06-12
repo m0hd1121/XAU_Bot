@@ -242,7 +242,8 @@ class Agent3TraderAgent(BaseAgent):
             self.log.exception("Agent3: StrategyEngine.evaluate() raised an exception.")
 
         if setup is None:
-            self.log.debug("Agent3: no setup at bar %d.", bar_index)
+            self.log.info("Agent3: no setup at bar %d (session=%s).", bar_index,
+                          getattr(candle, 'session', 'unknown'))
             self._record_decision(
                 "REJECT",
                 "no_setup",
@@ -715,7 +716,8 @@ class Agent3TraderAgent(BaseAgent):
                     explanation=explanation or {},
                 )
         except Exception:
-            self.log.debug("Agent3: insert_trade_decision() failed (non-fatal).")
+            self.log.warning("Agent3: insert_trade_decision() failed (decision=%s reason=%s).",
+                             decision, reason, exc_info=True)
 
     def _get_latest_intel_id(self) -> Optional[int]:
         """Return the row-id of the most recent market_intel row, or None."""
