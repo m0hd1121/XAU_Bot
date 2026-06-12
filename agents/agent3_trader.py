@@ -666,11 +666,17 @@ class Agent3TraderAgent(BaseAgent):
 
     @staticmethod
     def _trend_from_regime(regime: str) -> Trend:
-        """Map a regime string published by Agent 2 back to a Trend enum."""
+        """Map a regime string published by Agent 2 back to a Trend enum.
+
+        RANGING maps to UNKNOWN so the StrategyEngine's HTF gate is skipped
+        (the gate only blocks when bias is explicitly BULLISH or BEARISH but
+        mismatched — UNKNOWN means 'no strong directional signal, let M5
+        price action decide').
+        """
         mapping = {
             "TRENDING_BULLISH": Trend.BULLISH,
             "TRENDING_BEARISH": Trend.BEARISH,
-            "RANGING": Trend.RANGING,
+            "RANGING": Trend.UNKNOWN,   # no strong bias → don't block either direction
         }
         return mapping.get(regime, Trend.UNKNOWN)
 
