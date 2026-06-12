@@ -95,7 +95,15 @@ class Agent2IntelligenceAgent(BaseAgent):
         self.set_task("fetching OHLC")
 
         # ── 1. Fetch OHLC from Yahoo Finance ──────────────────────────────────
-        df = await asyncio.get_event_loop().run_in_executor(None, self._fetch_ohlc)
+        try:
+            df = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, self._fetch_ohlc),
+                timeout=45.0,
+            )
+        except asyncio.TimeoutError:
+            self.log.warning("Agent2: OHLC fetch timed out after 45s — skipping cycle.")
+            await asyncio.sleep(self._cycle_interval)
+            return
         if df is None or df.empty:
             self.log.warning("Agent2: OHLC fetch returned empty DataFrame — skipping cycle.")
             await asyncio.sleep(self._cycle_interval)

@@ -143,6 +143,8 @@ class Agent3TraderAgent(BaseAgent):
     # ── Main cycle ────────────────────────────────────────────────────────────
 
     async def run_cycle(self) -> None:
+        cycle_num = self._metrics.get("cycle_count", 0) + 1
+        self.log.info("Agent3: cycle %d starting (regime=%s)", cycle_num, self._latest_regime)
 
         # ── Step 1: Consume Agent 2 market intelligence ───────────────────────
         self.set_task("consuming market intelligence")
@@ -163,7 +165,15 @@ class Agent3TraderAgent(BaseAgent):
 
         # ── Step 3: Fetch fresh OHLC data ─────────────────────────────────────
         self.set_task("fetching OHLC data")
-        df = await asyncio.get_event_loop().run_in_executor(None, self._fetch_ohlc)
+        try:
+            df = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, self._fetch_ohlc),
+                timeout=45.0,
+            )
+        except asyncio.TimeoutError:
+            self.log.warning("Agent3: OHLC fetch timed out after 45s — skipping cycle.")
+            await asyncio.sleep(_CYCLE_SLEEP)
+            return
         if df is None or df.empty:
             self.log.warning("Agent3: OHLC fetch failed — skipping cycle.")
             await asyncio.sleep(_CYCLE_SLEEP)
